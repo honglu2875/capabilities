@@ -235,7 +235,8 @@ def flatten_model(m: Union[ModelMetaclass, str, bool, float, int]):
 @dataclass
 class Structured(CapabilityBase):
     """
-    Run a web search, summarizing the top results.
+    Supply Pydantic models `input_spec` and `output_spec` and a natural language `instruction: str`, and an `input: input_spec`
+    Return an `output: output_spec`.
     """
 
     headers: Dict[Any, Any] = field(
@@ -256,7 +257,6 @@ class Structured(CapabilityBase):
             instructions=instructions,
             input=dataclasses.asdict(input) if is_dataclass(input) else input.dict(),
         )
-        print("PAYLOAD: ", payload)
         r = requests.post(self.url, headers=self.headers, json=payload)
         result = r.json()["output"]
         return (
