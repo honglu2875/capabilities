@@ -22,20 +22,16 @@ def example_structured():
         supportedBulletPoints: List[SupportedBulletPoint]
 
     instructions: str = """\
-Write a bullet-pointed summary of the `text` as a list of supported bullet points, each with a `bullet_point` summarizing a passage from the `text` called `supporting_text`. The list should contain no more than five (5) items.
+Write a bullet-pointed summary of the `text` as a list of supported bullet points, each with a `bullet_point` summarizing a passage from the `text` called `supporting_text`. Each `supporting_text` should be a passage of text extracted verbatim from `text` which supports its corresponding `bullet_point`. The list should contain no more than five (5) items.
     """
 
     inp = Document(text=EXAMPLE_PASSAGE)
 
     document_summary = c(input_spec=Document, output_spec=DocumentSummary, input=inp, instructions=instructions)
 
-    summary = "\n- ".join(x.bullet_point for x in document_summary.supportedBulletPoints)
-    summary = "- " + summary
-
-    supporting_passages = "\n- ".join(x.supporting_text for x in document_summary.supportedBulletPoints)
-    print(summary)
-    print("-------")
-    print(supporting_passages)
+    for x in document_summary.supportedBulletPoints:
+        print(f"claim: {x.bullet_point}")
+        print(f"    support: \"\"\"{x.supporting_text}\"\"\"\n")
 
 
 def example_document_qa():
@@ -51,7 +47,6 @@ def example_search():
     print(c("Who discovered the useful properties of silicon carbide?"))
 
 
-# TODO(jesse): failure of
 def parse_table():
     class UnstructuredTable(BaseModel):
         unstructured_table: str
@@ -113,6 +108,7 @@ def test_factorization():
     c = Capability("multi/structured")
 
     import random
+    
     for x in random.choices(range(150, 550), k=4):
         input = Number(value=x)
         output = c(Number, PrimeFactorization, instructions, input)
@@ -125,8 +121,7 @@ def structured_chain_of_thought():
         input: str
 
     class ChainOfThought(BaseModel):
-        thoughts: List[str]
-        meta_thoughts: List[str]
+        thoughts: List[List[str]]
         conclusion: str
         meta_conclusion: str
 
@@ -141,13 +136,13 @@ def structured_chain_of_thought():
 
     def generate_chain_of_thought(input: Input) -> ChainOfThought:
         cot_instructions = """\
-Let's think step by step. Generate a list of `thought`s which comprise a detailed and correct solution to the problem posed in the `input`. Then, generate a list of `meta_thought`s which are in 1-1 correspondence with the `thought`s and provide a 1-sentence reflection on why that step of reasoning is correct. Then, based on the `thoughts`, write a sentence-long `conclusion`. Then also add a `meta_conclusion` which explains why the `conclusion` follows from the `thought`s.
+Let's think step by step. Generate a list of `thought`s which comprise a detailed and correct solution to the problem posed in the `input`. Each member of `thoughts` should be a list with two strings, where the first one is a step in the solution and the second one is a reflection on whether the first one is correct or incorrect. Then, based on the `thoughts`, write a sentence-long `conclusion`. Then also add a `meta_conclusion` which explains why the `conclusion` follows from the `thought`s.
         """
         return c(Input, ChainOfThought, cot_instructions, input)
 
     def generate_output(input, chain_of_thought) -> Output:
         output_instructions = """\
-After thinking step by step and reaching a conclusion, generate the `output` for the given `input`.
+After thinking step by step and reaching a conclusion, summarize the conclusion as a standalone `output`.
         """
         combined = CombinedInputOutput(input=input, cot=chain_of_thought)
         return c(CombinedInputOutput, Output, output_instructions, combined)
@@ -158,9 +153,10 @@ After thinking step by step and reaching a conclusion, generate the `output` for
     output = generate_output(input, cot)
     print("OUTPUT: ", output)
 
-
+    
 if __name__ == "__main__":
     # parse_table()
-    # example_structured()
+    example_structured()
     # test_factorization()
-    structured_chain_of_thought()
+    # structured_chain_of_thought()
+    # example_search()
