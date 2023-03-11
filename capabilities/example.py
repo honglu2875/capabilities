@@ -27,7 +27,15 @@ Write a bullet-pointed summary of the `text` as a list of supported bullet point
 
     inp = Document(text=EXAMPLE_PASSAGE)
 
-    print(c(input_spec=Document, output_spec=DocumentSummary, input=inp, instructions=instructions))
+    document_summary = c(input_spec=Document, output_spec=DocumentSummary, input=inp, instructions=instructions)
+
+    summary = "\n- ".join(x.bullet_point for x in document_summary.supportedBulletPoints)
+    summary = "- " + summary
+
+    supporting_passages = "\n- ".join(x.supporting_text for x in document_summary.supportedBulletPoints)
+    print(summary)
+    print("-------")
+    print(supporting_passages)
 
 
 def example_document_qa():
@@ -43,5 +51,116 @@ def example_search():
     print(c("Who discovered the useful properties of silicon carbide?"))
 
 
+# TODO(jesse): failure of
+def parse_table():
+    class UnstructuredTable(BaseModel):
+        unstructured_table: str
+
+    class ParsedCell(BaseModel):
+        cell_content: str
+
+    class ParsedRow(BaseModel):
+        cells: List[ParsedCell]
+
+    class ParsedTable(BaseModel):
+        rows: List[ParsedRow]
+
+
+    instructions: str = """\
+    Given the following `unstructured_table` ASCII representation of a table, parse it into a list of rows where each row is a list of cells, consisting of the contents of each cell of the `unstructured_table` with all trailing and leading whitespace stripped."""
+
+    c = Capability("multi/structured")
+
+    unstructured_table = """\
+|mathqa        |      0|acc     |  0.2500|_  | 0.0435|
+|              |       |acc_norm|  0.2300|_  | 0.0423|
+|lambada_openai|      0|ppl     |145.0963|_  |53.1010|
+|              |       |acc     |  0.2400|_  | 0.0429|
+|boolq         |      1|acc     |  0.6000|_  | 0.0492|
+|hellaswag     |      0|acc     |  0.3000|_  | 0.0461|
+|              |       |acc_norm|  0.3600|_  | 0.0482|
+|triviaqa      |      1|acc     |  0.0000|_  | 0.0000|
+|winogrande    |      0|acc     |  0.4000|_  | 0.0492|
+|race          |      1|acc     |  0.2900|_  | 0.0456|"""
+
+    parsed_table = c(UnstructuredTable, ParsedTable, instructions, UnstructuredTable(unstructured_table=unstructured_table))
+    for row in parsed_table.rows:
+        print("|".join(cell.cell_content for cell in row.cells))
+
+
+def test_factorization():
+    class Number(BaseModel):
+        value: int
+
+    class PrimeFactor(BaseModel):
+        prime: int
+        exponent: int
+
+    class PrimeFactorization(BaseModel):
+        factors: List[PrimeFactor]
+
+    instructions: str = """\
+    Given the `value: int`, return a prime factorization as a list of pairs of `prime` and `exponent`s."""
+
+    def verify(input, factorization):
+        running_product = 1
+        for factor in factorization.factors:
+            running_product *= factor.prime ** factor.exponent
+
+        print(f"running_product={running_product}")
+        return input.value == running_product
+
+    c = Capability("multi/structured")
+
+    import random
+    for x in random.choices(range(150, 550), k=4):
+        input = Number(value=x)
+        output = c(Number, PrimeFactorization, instructions, input)
+        print(output)
+        print(verify(input, output))
+
+
+def structured_chain_of_thought():
+    class Input(BaseModel):
+        input: str
+
+    class ChainOfThought(BaseModel):
+        thoughts: List[str]
+        meta_thoughts: List[str]
+        conclusion: str
+        meta_conclusion: str
+
+    class CombinedInputOutput(BaseModel):
+        input: Input
+        cot: ChainOfThought
+
+    class Output(BaseModel):
+        output: str
+
+    c = Capability("multi/structured")
+
+    def generate_chain_of_thought(input: Input) -> ChainOfThought:
+        cot_instructions = """\
+Let's think step by step. Generate a list of `thought`s which comprise a detailed and correct solution to the problem posed in the `input`. Then, generate a list of `meta_thought`s which are in 1-1 correspondence with the `thought`s and provide a 1-sentence reflection on why that step of reasoning is correct. Then, based on the `thoughts`, write a sentence-long `conclusion`. Then also add a `meta_conclusion` which explains why the `conclusion` follows from the `thought`s.
+        """
+        return c(Input, ChainOfThought, cot_instructions, input)
+
+    def generate_output(input, chain_of_thought) -> Output:
+        output_instructions = """\
+After thinking step by step and reaching a conclusion, generate the `output` for the given `input`.
+        """
+        combined = CombinedInputOutput(input=input, cot=chain_of_thought)
+        return c(CombinedInputOutput, Output, output_instructions, combined)
+
+    input = Input(input="""What is the prime factorization of 7975?""")
+    cot = generate_chain_of_thought(input)
+    print("COT: ", cot)
+    output = generate_output(input, cot)
+    print("OUTPUT: ", output)
+
+
 if __name__ == "__main__":
-    example_structured()
+    # parse_table()
+    # example_structured()
+    # test_factorization()
+    structured_chain_of_thought()

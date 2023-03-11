@@ -81,7 +81,7 @@ class Summarize(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/summarization"
+                url = "https://api.multi.dev/summarize"
                 headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
                 payload = {
                     "document": document,
@@ -101,7 +101,7 @@ class Summarize(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/summarization"
+                url = "https://api.multi.dev/summarize"
                 if session is None:
                     async with aiohttp.ClientSession(
                         connector=aiohttp.TCPConnector(ssl=False)
@@ -282,7 +282,9 @@ class Structured(CapabilityBase):
         if session is None:
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
                 async with session.post(self.url, headers=self.headers, json=payload) as resp:
-                    result = await resp.json()
+                    
+                    result = (await resp.json())
+                    result = result["output"]
                     return (
                         output_spec.parse_obj(result)
                         if isinstance(output_spec, ModelMetaclass)
@@ -290,7 +292,7 @@ class Structured(CapabilityBase):
                     )
         else:
             async with session.post(self.url, headers=self.headers, json=payload) as resp:
-                result = await resp.json()
+                result = (await resp.json())["output"]
                 return (
                     output_spec.parse_obj(result)
                     if isinstance(output_spec, ModelMetaclass)
