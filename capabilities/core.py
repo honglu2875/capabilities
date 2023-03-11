@@ -20,6 +20,35 @@ class CapabilityBase:
 
 @dataclass
 class DocumentQA(CapabilityBase):
+    """
+    DocumentQA capability that sends the given query to DocumentQA service for answering based on the provided document.
+
+    Attributes:
+        None
+
+    Methods:
+        __call__(self, document: str, query: str) -> dict:
+            Sends the given query to DocumentQA service for answering based on the provided document.
+            Args:
+                document: A string representing the input document.
+                query: A string representing the query for DocumentQA.
+            Returns:
+                A dictionary containing the answer returned by the DocumentQA service.
+            Raises:
+                Exception: When the retries hit maximum (8) times and nothing was returned.
+
+        async run_async(self, document: str, query: str, session=None) -> coroutine:
+            Sends the given query to DocumentQA service for answering based on the provided document asynchronously.
+            Args:
+                document: A string representing the input document.
+                query: A string representing the query for DocumentQA.
+                session: An instance of `aiohttp.ClientSession`.
+            Returns:
+                A coroutine that resolves to a dictionary containing the answer returned 
+                by the DocumentQA service.
+            Raises:
+                Exception: When the retries hit maximum (8) times and nothing was returned.
+    """
     def __call__(self, document: str, query: str):
         print(f"[DocumentQA] running query against document with {len(document)} characters")
         patience = 8
@@ -74,8 +103,33 @@ class DocumentQA(CapabilityBase):
         raise Exception("[DocumentQA] failed after hitting max retries")
 
 
+
 @dataclass
 class Summarize(CapabilityBase):
+    """
+    Class for summarizing text using an API call to https://api.multi.dev/summarize.
+
+    Args:
+        CapabilityBase (class): Base class for all capabilities.
+
+    Methods:
+        __call__(self, document: str) -> Dict[str, Any]:
+            Method for summarizing `document`. Makes a POST request to the API and returns the JSON response.
+            Retries up to 8 times with exponentially increasing sleep times before giving up.
+            Args:
+                document (str): The text to be summarized.
+            Returns:
+                Dict[str, Any]: A dictionary object representing the summary, with keys 'summary' (str) and 'score' (float).
+
+        async run_async(self, document: str, session=None) -> Dict[str, Any]:
+            Async method for summarizing `document`. Makes an async POST request to the API and returns the JSON response.
+            Retries up to 8 times with exponentially increasing sleep times before giving up.
+            Args:
+                document (str): The text to be summarized.
+                session (aiohttp.ClientSession, optional): An aiohttp client session. If not provided, a new one is created. Defaults to None.
+            Returns:
+                Dict[str, Any]: A dictionary object representing the summary, with keys 'summary' (str) and 'score' (float).
+    """    
     def __call__(self, document: str):
         patience = 8
         count = 0
@@ -128,6 +182,8 @@ class Summarize(CapabilityBase):
         raise Exception("[Summarize] failed after hitting max retries")
 
 
+
+
 @dataclass
 class Ask(CapabilityBase):
     headers: Dict[Any, Any] = field(
@@ -135,21 +191,21 @@ class Ask(CapabilityBase):
     )
     url: str = "https://api.multi.dev/ask"
 
-    def __call__(self, query: str):
-        payload = dict(query=query)
+    def __call__(self, question: str):
+        payload = dict(question=question)
         r = requests.post(self.url, headers=self.headers, json=payload)
         return r.json()
 
-    async def run_async(self, query: str, session=None):
+    async def run_async(self, question: str, session=None):
         if session is None:
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
                 async with session.post(
-                    self.url, headers=self.headers, json=dict(query=query)
+                    self.url, headers=self.headers, json=dict(question=question)
                 ) as resp:
                     result = await resp.json()
                     return result
         else:
-            async with session.post(self.url, headers=self.headers, json=dict(query=query)) as resp:
+            async with session.post(self.url, headers=self.headers, json=dict(question=question)) as resp:
                 result = await resp.json()
                 return result
 
@@ -189,7 +245,6 @@ class Search(CapabilityBase):
     """
     Run a web search, summarizing the top results.
     """
-
     headers: Dict[Any, Any] = field(
         default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
     )
@@ -235,10 +290,17 @@ def flatten_model(m: Union[ModelMetaclass, str, bool, float, int]):
 @dataclass
 class Structured(CapabilityBase):
     """
-    Supply Pydantic models `input_spec` and `output_spec` and a natural language `instruction: str`, and an `input: input_spec`
-    Return an `output: output_spec`.
-    """
+    `Structured` class allows making requests to the multi API for structured tasks. The class extends CapabilityBase which provides required functionality to interact with multi API. Structured tasks are tasks with specific input and output specs with a natural language instruction.
 
+    Attributes:
+        headers (Dict[Any, Any]): HTTP headers to use in requests. It includes the Content-type and API Key parameters.
+        url (str): API endpoint URL
+
+    Methods:
+        __call__(self, input_spec: ModelMetaclass, output_spec: ModelMetaclass, instructions: str, input: BaseModel) -> Union[output_spec, BaseModel]: Calls the API by sending a payload within a request object. Returns output_spec object if output_spec is ModelMetaclass or if it is an instance of a BaseModel.
+    
+        async run_async(self, input_spec: ModelMetaclass, output_spec: ModelMetaclass, instructions: str, input: BaseModel, session=None) -> Union[output_spec, BaseModel]: Calls the API asynchroniously. Returns output_spec object if output_spec is ModelMetaclass or if it is an instance of a BaseModel.
+    """
     headers: Dict[Any, Any] = field(
         default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
     )
@@ -300,7 +362,7 @@ class Structured(CapabilityBase):
                 )
 
 
-_CAPABILITIES_DIRECTORY = {
+_CAPABILITIES = {
     "multi/summarize": Summarize(),
     "multi/document_qa": DocumentQA(),
     "multi/ask": Ask(),
@@ -323,8 +385,8 @@ class Capability(CapabilityBase):
 
     def __post_init__(self):
         try:
-            self._capability = _CAPABILITIES_DIRECTORY[self.uri]
+            self._capability = _CAPABILITIES[self.uri]
         except KeyError as e:
             print(f"Capability lookup failed for uri={self.uri}.\nValid URIs are:")
-            for k in _CAPABILITIES_DIRECTORY.keys():
+            for k in _CAPABILITIES.keys():
                 print(f"  {k}")
