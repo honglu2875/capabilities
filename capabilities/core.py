@@ -1,3 +1,4 @@
+import os
 import dataclasses
 import dacite
 from dataclasses import dataclass, field, is_dataclass
@@ -11,6 +12,8 @@ import time
 from capabilities.config import CONFIG
 from pydantic import BaseModel
 from pydantic.main import ModelMetaclass
+import markdown
+from readability import Document
 
 
 @dataclass
@@ -44,7 +47,7 @@ class DocumentQA(CapabilityBase):
                 query: A string representing the query for DocumentQA.
                 session: An instance of `aiohttp.ClientSession`.
             Returns:
-                A coroutine that resolves to a dictionary containing the answer returned 
+                A coroutine that resolves to a dictionary containing the answer returned
                 by the DocumentQA service.
             Raises:
                 Exception: When the retries hit maximum (8) times and nothing was returned.
@@ -129,7 +132,7 @@ class Summarize(CapabilityBase):
                 session (aiohttp.ClientSession, optional): An aiohttp client session. If not provided, a new one is created. Defaults to None.
             Returns:
                 Dict[str, Any]: A dictionary object representing the summary, with keys 'summary' (str) and 'score' (float).
-    """    
+    """
     def __call__(self, document: str):
         patience = 8
         count = 0
@@ -180,34 +183,6 @@ class Summarize(CapabilityBase):
                 count += 1
                 time.sleep(sleep_duration)
         raise Exception("[Summarize] failed after hitting max retries")
-
-
-
-
-@dataclass
-class Ask(CapabilityBase):
-    headers: Dict[Any, Any] = field(
-        default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
-    )
-    url: str = "https://api.multi.dev/ask"
-
-    def __call__(self, question: str):
-        payload = dict(question=question)
-        r = requests.post(self.url, headers=self.headers, json=payload)
-        return r.json()
-
-    async def run_async(self, question: str, session=None):
-        if session is None:
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-                async with session.post(
-                    self.url, headers=self.headers, json=dict(question=question)
-                ) as resp:
-                    result = await resp.json()
-                    return result
-        else:
-            async with session.post(self.url, headers=self.headers, json=dict(question=question)) as resp:
-                result = await resp.json()
-                return result
 
 
 @dataclass
@@ -288,6 +263,36 @@ def flatten_model(m: Union[ModelMetaclass, str, bool, float, int]):
 
 
 @dataclass
+class WebContent(CapabilityBase):
+    def __call__(self, url):
+        endpoint_url = f"https://chrome.browserless.io/content?token={os.environ.get('BROWSERLESS_API_KEY')}"
+
+        payload = {'url': url}
+
+        headers = {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+        response = requests.post(endpoint_url, json=payload, headers=headers)
+        return Document(response._content.decode("utf-8")).content()
+
+    async def run_async(self, url, session=None):
+        if session is None:
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+                return await self.run_async(url, session=session)
+        else:
+            payload = {'url': url}
+            endpoint_url = f"https://chrome.browserless.io/content?token={os.environ.get('BROWSERLESS_API_KEY')}"
+            headers = {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache'
+            }
+            async with session.post(endpoint_url, headers=headers, json=payload) as resp:
+                result = (await resp.content.read()).decode("utf-8")
+                return Document(result).summary()
+
+
+@dataclass
 class Structured(CapabilityBase):
     """
     `Structured` class allows making requests to the multi API for structured tasks. The class extends CapabilityBase which provides required functionality to interact with multi API. Structured tasks are tasks with specific input and output specs with a natural language instruction.
@@ -298,8 +303,8 @@ class Structured(CapabilityBase):
 
     Methods:
         __call__(self, input_spec: ModelMetaclass, output_spec: ModelMetaclass, instructions: str, input: BaseModel) -> Union[output_spec, BaseModel]: Calls the API by sending a payload within a request object. Returns output_spec object if output_spec is ModelMetaclass or if it is an instance of a BaseModel.
-    
-        async run_async(self, input_spec: ModelMetaclass, output_spec: ModelMetaclass, instructions: str, input: BaseModel, session=None) -> Union[output_spec, BaseModel]: Calls the API asynchroniously. Returns output_spec object if output_spec is ModelMetaclass or if it is an instance of a BaseModel.
+
+        async run_async(self, input_spec: ModelMetaclass, output_spec: ModelMetaclass, instructions: str, input: BaseModel, session=None) -> Union[output_spec, BaseModel]: Calls the API asynchronously. Returns output_spec object if output_spec is ModelMetaclass or if it is an instance of a BaseModel.
     """
     headers: Dict[Any, Any] = field(
         default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
@@ -344,7 +349,7 @@ class Structured(CapabilityBase):
         if session is None:
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
                 async with session.post(self.url, headers=self.headers, json=payload) as resp:
-                    
+
                     result = (await resp.json())
                     result = result["output"]
                     return (
@@ -365,10 +370,10 @@ class Structured(CapabilityBase):
 _CAPABILITIES = {
     "multi/summarize": Summarize(),
     "multi/document_qa": DocumentQA(),
-    "multi/ask": Ask(),
     "multi/sql": Sql(),
     "multi/search": Search(),
     "multi/structured": Structured(),
+    "multi/web_content": WebContent(),
 }
 
 

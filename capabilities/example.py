@@ -8,37 +8,66 @@ Wide-scale production is credited to Edward Goodrich Acheson in 1890.[11] Acheso
 """
 
 
+
 def example_structured():
+    # structured synthesis capability
+    # callable and accepts Pydantic dataclasses for specification
+    # along with a natural language instruction
     c = Capability("multi/structured")
 
     class Document(BaseModel):
+        """
+        A class representing a document with a text field.
+        """
         text: str
 
+    # informal spec: bullet_point clearly follows from the supporting text
     class SupportedBulletPoint(BaseModel):
+        """
+        A class representing a supported bullet point in a document summary.
+        A supported bullet point has a bullet point summarizing a passage from the text,
+        as well as the supporting text itself, which is a passage of text extracted verbatim from the document.
+        """
         bullet_point: str
         supporting_text: str
 
     class DocumentSummary(BaseModel):
+        """
+        A class representing a summary of a document, consisting of a list of supported bullet points.
+        """
         supportedBulletPoints: List[SupportedBulletPoint]
 
+    # other part of the informal spec
     instructions: str = """\
 Write a bullet-pointed summary of the `text` as a list of supported bullet points, each with a `bullet_point` summarizing a passage from the `text` called `supporting_text`. Each `supporting_text` should be a passage of text extracted verbatim from `text` which supports its corresponding `bullet_point`. The list should contain no more than five (5) items.
     """
 
     inp = Document(text=EXAMPLE_PASSAGE)
 
-    document_summary = c(input_spec=Document, output_spec=DocumentSummary, input=inp, instructions=instructions)
+    # synthesis call
+    document_summary = Capability("multi/structured")(
+        input_spec=Document,
+        output_spec=DocumentSummary,
+        input=inp,
+        instructions=instructions
+    )
 
     for x in document_summary.supportedBulletPoints:
         print(f"claim: {x.bullet_point}")
-        print(f"    support: \"\"\"{x.supporting_text}\"\"\"\n")
+        print(f'    support: """{x.supporting_text}"""\n')
+
+
 
 
 def example_document_qa():
     c = Capability("multi/document_qa")
-    answer = c(EXAMPLE_PASSAGE, "Who formed the Carborundum Company?")
+    question = "Who formed the Carborundum Company?"
+    answer = c(EXAMPLE_PASSAGE, question)
+    print(dict(question=question))
     print(answer)
-    answer = c(EXAMPLE_PASSAGE, "What colors were emitted by the first LED crystal?")
+    question = "What colors were emitted by the first LED crystal?"
+    answer = c(EXAMPLE_PASSAGE, question)
+    print(dict(question=question))
     print(answer)
 
 
@@ -60,7 +89,6 @@ def parse_table():
     class ParsedTable(BaseModel):
         rows: List[ParsedRow]
 
-
     instructions: str = """\
     Given the following `unstructured_table` ASCII representation of a table, parse it into a list of rows where each row is a list of cells, consisting of the contents of each cell of the `unstructured_table` with all trailing and leading whitespace stripped."""
 
@@ -72,13 +100,18 @@ def parse_table():
 |lambada_openai|      0|ppl     |145.0963|_  |53.1010|
 |              |       |acc     |  0.2400|_  | 0.0429|
 |boolq         |      1|acc     |  0.6000|_  | 0.0492|
-|hellaswag     |      0|acc     |  0.3000|_  | 0.0461|
-|              |       |acc_norm|  0.3600|_  | 0.0482|
+|hellaswag     |      0|acc     |  0.3000|_  | 0.0461||
+              |       |acc_norm|  0.3600|_  | 0.0482|
 |triviaqa      |      1|acc     |  0.0000|_  | 0.0000|
 |winogrande    |      0|acc     |  0.4000|_  | 0.0492|
 |race          |      1|acc     |  0.2900|_  | 0.0456|"""
 
-    parsed_table = c(UnstructuredTable, ParsedTable, instructions, UnstructuredTable(unstructured_table=unstructured_table))
+    parsed_table = c(
+        UnstructuredTable,
+        ParsedTable,
+        instructions,
+        UnstructuredTable(unstructured_table=unstructured_table),
+    )
     for row in parsed_table.rows:
         print("|".join(cell.cell_content for cell in row.cells))
 
@@ -100,7 +133,7 @@ def test_factorization():
     def verify(input, factorization):
         running_product = 1
         for factor in factorization.factors:
-            running_product *= factor.prime ** factor.exponent
+            running_product *= factor.prime**factor.exponent
 
         print(f"running_product={running_product}")
         return input.value == running_product
@@ -108,7 +141,7 @@ def test_factorization():
     c = Capability("multi/structured")
 
     import random
-    
+
     for x in random.choices(range(150, 550), k=4):
         input = Number(value=x)
         output = c(Number, PrimeFactorization, instructions, input)
@@ -152,11 +185,21 @@ After thinking step by step and reaching a conclusion, summarize the conclusion 
     print("COT: ", cot)
     output = generate_output(input, cot)
     print("OUTPUT: ", output)
-
     
+
+    # print(sr("yeehaw"))
+    # import urllib.parse
+    # query_str = urllib.parse.quote(query)
+    # search_results_page = wc(f"https://www.google.com/search?q={query_str}")
+    # print("SEARCH RESULTS: ", search_results_page)
+
+
 if __name__ == "__main__":
     # parse_table()
     example_structured()
+    # example_document_qa()
+    # import fire
+    # fire.Fire(search2)
     # test_factorization()
     # structured_chain_of_thought()
     # example_search()
