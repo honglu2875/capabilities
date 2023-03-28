@@ -52,19 +52,23 @@ class DocumentQA(CapabilityBase):
             Raises:
                 Exception: When the retries hit maximum (8) times and nothing was returned.
     """
+
     def __call__(self, document: str, query: str):
         print(f"[DocumentQA] running query against document with {len(document)} characters")
         patience = 8
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/documentqa"
+                url = "https://api.multi.dev/multi/documentqa"
                 headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
                 payload = {
                     "document": document,
                     "query": query,
                 }
                 resp = requests.post(url=url, headers=headers, json=payload)
+                import curl
+
+                curl.parse(resp)
                 return resp.json()
             except:
                 sleep_duration = 2.0**count
@@ -79,7 +83,7 @@ class DocumentQA(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/documentqa"
+                url = "https://api.multi.dev/multi/documentqa"
                 if session is None:
                     async with aiohttp.ClientSession(
                         connector=aiohttp.TCPConnector(ssl=False)
@@ -106,11 +110,10 @@ class DocumentQA(CapabilityBase):
         raise Exception("[DocumentQA] failed after hitting max retries")
 
 
-
 @dataclass
 class Summarize(CapabilityBase):
     """
-    Class for summarizing text using an API call to https://api.multi.dev/summarize.
+    Class for summarizing text using an API call to https://api.multi.dev/multi/summarize.
 
     Args:
         CapabilityBase (class): Base class for all capabilities.
@@ -133,12 +136,13 @@ class Summarize(CapabilityBase):
             Returns:
                 Dict[str, Any]: A dictionary object representing the summary, with keys 'summary' (str) and 'score' (float).
     """
+
     def __call__(self, document: str):
         patience = 8
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/summarize"
+                url = "https://api.multi.dev/multi/summarize"
                 headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
                 payload = {
                     "document": document,
@@ -158,7 +162,7 @@ class Summarize(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/summarize"
+                url = "https://api.multi.dev/multi/summarize"
                 if session is None:
                     async with aiohttp.ClientSession(
                         connector=aiohttp.TCPConnector(ssl=False)
@@ -190,7 +194,7 @@ class Sql(CapabilityBase):
     headers: Dict[Any, Any] = field(
         default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
     )
-    url: str = "https://api.multi.dev/sql"
+    url: str = "https://api.multi.dev/multi/sql"
 
     def __call__(self, query: str, sql_schema: str, sql_variant: Optional[str] = "vanilla"):
         payload = dict(query=query, sql_schema=sql_schema, sql_type=sql_variant)
@@ -220,10 +224,11 @@ class Search(CapabilityBase):
     """
     Run a web search, summarizing the top results.
     """
+
     headers: Dict[Any, Any] = field(
         default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
     )
-    url: str = "https://api.multi.dev/search"
+    url: str = "https://api.multi.dev/multi/search"
 
     def __call__(self, query: str):
         payload = dict(query=query)
@@ -265,14 +270,13 @@ def flatten_model(m: Union[ModelMetaclass, str, bool, float, int]):
 @dataclass
 class WebContent(CapabilityBase):
     def __call__(self, url):
-        endpoint_url = f"https://chrome.browserless.io/content?token={os.environ.get('BROWSERLESS_API_KEY')}"
+        endpoint_url = (
+            f"https://chrome.browserless.io/content?token={os.environ.get('BROWSERLESS_API_KEY')}"
+        )
 
-        payload = {'url': url}
+        payload = {"url": url}
 
-        headers = {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
-        }
+        headers = {"Content-Type": "application/json", "Cache-Control": "no-cache"}
         response = requests.post(endpoint_url, json=payload, headers=headers)
         return Document(response._content.decode("utf-8")).content()
 
@@ -281,12 +285,9 @@ class WebContent(CapabilityBase):
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
                 return await self.run_async(url, session=session)
         else:
-            payload = {'url': url}
+            payload = {"url": url}
             endpoint_url = f"https://chrome.browserless.io/content?token={os.environ.get('BROWSERLESS_API_KEY')}"
-            headers = {
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache'
-            }
+            headers = {"Content-Type": "application/json", "Cache-Control": "no-cache"}
             async with session.post(endpoint_url, headers=headers, json=payload) as resp:
                 result = (await resp.content.read()).decode("utf-8")
                 return Document(result).summary()
@@ -306,10 +307,12 @@ class Structured(CapabilityBase):
 
         async run_async(self, input_spec: ModelMetaclass, output_spec: ModelMetaclass, instructions: str, input: BaseModel, session=None) -> Union[output_spec, BaseModel]: Calls the API asynchronously. Returns output_spec object if output_spec is ModelMetaclass or if it is an instance of a BaseModel.
     """
+
     headers: Dict[Any, Any] = field(
         default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
     )
-    url: str = "https://api.multi.dev/structured"
+    url: str = "https://api.multi.dev/multi/structured"
+    # url: str = "https://multi-api-3lt5g6vshq-uc.a.run.app/structured"
 
     def __call__(
         self,
@@ -350,7 +353,7 @@ class Structured(CapabilityBase):
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
                 async with session.post(self.url, headers=self.headers, json=payload) as resp:
 
-                    result = (await resp.json())
+                    result = await resp.json()
                     result = result["output"]
                     return (
                         output_spec.parse_obj(result)

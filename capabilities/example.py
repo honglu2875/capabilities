@@ -1,12 +1,11 @@
-from capabilities.core import Capability
 import fire
+from capabilities import Capability
 from pydantic import BaseModel
 from typing import List
 
 EXAMPLE_PASSAGE = """\
 Wide-scale production is credited to Edward Goodrich Acheson in 1890.[11] Acheson was attempting to prepare artificial diamonds when he heated a mixture of clay (aluminium silicate) and powdered coke (carbon) in an iron bowl. He called the blue crystals that formed carborundum, believing it to be a new compound of carbon and aluminium, similar to corundum. Moissan also synthesized SiC by several routes, including dissolution of carbon in molten silicon, melting a mixture of calcium carbide and silica, and by reducing silica with carbon in an electric furnace. Acheson patented the method for making silicon carbide powder on February 28, 1893.[12] Acheson also developed the electric batch furnace by which SiC is still made today and formed the Carborundum Company to manufacture bulk SiC, initially for use as an abrasive.[13] In 1900 the company settled with the Electric Smelting and Aluminum Company when a judge's decision gave "priority broadly" to its founders "for reducing ores and other substances by the incandescent method".[14] It is said that Acheson was trying to dissolve carbon in molten corundum (alumina) and discovered the presence of hard, blue-black crystals which he believed to be a compound of carbon and corundum: hence carborundum. It may be that he named the material "carborundum" by analogy to corundum, which is another very hard substance (9 on the Mohs scale). The first use of SiC was as an abrasive. This was followed by electronic applications. In the beginning of the 20th century, silicon carbide was used as a detector in the first radios.[15] In 1907 Henry Joseph Round produced the first LED by applying a voltage to a SiC crystal and observing yellow, green and orange emission at the cathode. The effect was later rediscovered by O. V. Losev in the Soviet Union in 1923.[16]\
 """
-
 
 
 def example_structured():
@@ -19,6 +18,7 @@ def example_structured():
         """
         A class representing a document with a text field.
         """
+
         text: str
 
     # informal spec: bullet_point clearly follows from the supporting text
@@ -28,6 +28,7 @@ def example_structured():
         A supported bullet point has a bullet point summarizing a passage from the text,
         as well as the supporting text itself, which is a passage of text extracted verbatim from the document.
         """
+
         bullet_point: str
         supporting_text: str
 
@@ -35,6 +36,7 @@ def example_structured():
         """
         A class representing a summary of a document, consisting of a list of supported bullet points.
         """
+
         supportedBulletPoints: List[SupportedBulletPoint]
 
     # other part of the informal spec
@@ -46,17 +48,12 @@ Write a bullet-pointed summary of the `text` as a list of supported bullet point
 
     # synthesis call
     document_summary = Capability("multi/structured")(
-        input_spec=Document,
-        output_spec=DocumentSummary,
-        input=inp,
-        instructions=instructions
+        input_spec=Document, output_spec=DocumentSummary, input=inp, instructions=instructions
     )
 
     for x in document_summary.supportedBulletPoints:
         print(f"claim: {x.bullet_point}")
         print(f'    support: """{x.supporting_text}"""\n')
-
-
 
 
 def example_document_qa():
@@ -185,7 +182,6 @@ After thinking step by step and reaching a conclusion, summarize the conclusion 
     print("COT: ", cot)
     output = generate_output(input, cot)
     print("OUTPUT: ", output)
-    
 
     # print(sr("yeehaw"))
     # import urllib.parse
@@ -194,12 +190,44 @@ After thinking step by step and reaching a conclusion, summarize the conclusion 
     # print("SEARCH RESULTS: ", search_results_page)
 
 
+def example_translation():
+    """
+    Translate some text into French.
+    """
+
+    # define the input and output models
+    class InputText(BaseModel):
+        text: str
+
+    class WordTranslation(BaseModel):
+        source: str
+        target: str
+
+    class TranslationOutput(BaseModel):
+        translation: str
+        word_translations: List[WordTranslation]
+
+    # create an input instance
+    inp = InputText(
+        text="Understand: I'll slip quietly away through twilit meadows with only this one dream - you come too."
+    )
+
+    # provide some instructions
+    instructions = "Given the input `text`, produce a `french_translation` which translates the `text` into French. Also produce a word-level translation called `word_translations`, which is a list of (english word, french transliteration) pairs."
+
+    # print the task to console
+    result = Capability("multi/structured")(InputText, TranslationOutput, instructions, inp)
+    import json
+
+    print(json.dumps(result.dict(), indent=2))
+
+
+def example_summarize():
+    print(Capability("multi/summarize")(EXAMPLE_PASSAGE))
+
+
+# example usage: python -m capabilities.example example_translation
 if __name__ == "__main__":
-    # parse_table()
-    example_structured()
-    # example_document_qa()
-    # import fire
-    # fire.Fire(search2)
-    # test_factorization()
-    # structured_chain_of_thought()
-    # example_search()
+    import sys
+
+    fire.Fire(component=locals()[sys.argv[1]], command=sys.argv[2:])
