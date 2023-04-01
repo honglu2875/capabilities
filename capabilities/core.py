@@ -12,8 +12,6 @@ import time
 from capabilities.config import CONFIG
 from pydantic import BaseModel
 from pydantic.main import ModelMetaclass
-import markdown
-from readability import Document
 
 
 @dataclass
@@ -371,12 +369,9 @@ class Structured(CapabilityBase):
 
 
 _CAPABILITIES = {
-    "multi/summarize": Summarize(),
-    "multi/document_qa": DocumentQA(),
-    "multi/sql": Sql(),
-    "multi/search": Search(),
     "multi/structured": Structured(),
-    "multi/web_content": WebContent(),
+    "multi/document_qa": DocumentQA(),    
+    "multi/summarize": Summarize(),
 }
 
 

@@ -109,6 +109,7 @@ def parse_table():
         instructions,
         UnstructuredTable(unstructured_table=unstructured_table),
     )
+
     for row in parsed_table.rows:
         print("|".join(cell.cell_content for cell in row.cells))
 
