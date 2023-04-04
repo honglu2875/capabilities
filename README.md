@@ -1,6 +1,6 @@
 # capabilities
 
-Multi Capabilities SDK
+Blazon Capabilities SDK
 
 # Install and run example
 

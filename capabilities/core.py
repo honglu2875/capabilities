@@ -57,7 +57,7 @@ class DocumentQA(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/multi/documentqa"
+                url = "https://api.multi.dev/blazon/documentqa"
                 headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
                 payload = {
                     "document": document,
@@ -81,7 +81,7 @@ class DocumentQA(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/multi/documentqa"
+                url = "https://api.multi.dev/blazon/documentqa"
                 if session is None:
                     async with aiohttp.ClientSession(
                         connector=aiohttp.TCPConnector(ssl=False)
@@ -111,7 +111,7 @@ class DocumentQA(CapabilityBase):
 @dataclass
 class Summarize(CapabilityBase):
     """
-    Class for summarizing text using an API call to https://api.multi.dev/multi/summarize.
+    Class for summarizing text using an API call to https://api.multi.dev/blazon/summarize.
 
     Args:
         CapabilityBase (class): Base class for all capabilities.
@@ -140,7 +140,7 @@ class Summarize(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/multi/summarize"
+                url = "https://api.multi.dev/blazon/summarize"
                 headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
                 payload = {
                     "document": document,
@@ -160,7 +160,7 @@ class Summarize(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/multi/summarize"
+                url = "https://api.multi.dev/blazon/summarize"
                 if session is None:
                     async with aiohttp.ClientSession(
                         connector=aiohttp.TCPConnector(ssl=False)
@@ -192,7 +192,7 @@ class Sql(CapabilityBase):
     headers: Dict[Any, Any] = field(
         default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
     )
-    url: str = "https://api.multi.dev/multi/sql"
+    url: str = "https://api.multi.dev/blazon/sql"
 
     def __call__(self, query: str, sql_schema: str, sql_variant: Optional[str] = "vanilla"):
         payload = dict(query=query, sql_schema=sql_schema, sql_type=sql_variant)
@@ -226,7 +226,7 @@ class Search(CapabilityBase):
     headers: Dict[Any, Any] = field(
         default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
     )
-    url: str = "https://api.multi.dev/multi/search"
+    url: str = "https://api.multi.dev/blazon/search"
 
     def __call__(self, query: str):
         payload = dict(query=query)
@@ -309,7 +309,7 @@ class Structured(CapabilityBase):
     headers: Dict[Any, Any] = field(
         default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
     )
-    url: str = "https://api.multi.dev/multi/structured"
+    url: str = "https://api.multi.dev/blazon/structured"
     # url: str = "https://multi-api-3lt5g6vshq-uc.a.run.app/structured"
 
     def __call__(
@@ -370,8 +370,11 @@ class Structured(CapabilityBase):
 
 _CAPABILITIES = {
     "multi/structured": Structured(),
-    "multi/document_qa": DocumentQA(),    
+    "multi/document_qa": DocumentQA(),
     "multi/summarize": Summarize(),
+    "blazon/structured": Structured(),
+    "blazon/document_qa": DocumentQA(),
+    "blazon/summarize": Summarize(),
 }
 
 

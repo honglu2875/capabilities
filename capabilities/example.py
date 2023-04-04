@@ -12,7 +12,7 @@ def example_structured():
     # structured synthesis capability
     # callable and accepts Pydantic dataclasses for specification
     # along with a natural language instruction
-    c = Capability("multi/structured")
+    c = Capability("blazon/structured")
 
     class Document(BaseModel):
         """
@@ -47,7 +47,7 @@ Write a bullet-pointed summary of the `text` as a list of supported bullet point
     inp = Document(text=EXAMPLE_PASSAGE)
 
     # synthesis call
-    document_summary = Capability("multi/structured")(
+    document_summary = Capability("blazon/structured")(
         input_spec=Document, output_spec=DocumentSummary, input=inp, instructions=instructions
     )
 
@@ -56,20 +56,31 @@ Write a bullet-pointed summary of the `text` as a list of supported bullet point
         print(f'    support: """{x.supporting_text}"""\n')
 
 
+# def example_document_qa():
+#     c = Capability("blazon/document_qa")
+#     question = "Who formed the Carborundum Company?"
+#     answer = c(EXAMPLE_PASSAGE, question)
+#     print(dict(question=question))
+#     print(answer)
+#     question = "What colors were emitted by the first LED crystal?"
+#     answer = c(EXAMPLE_PASSAGE, question)
+#     print(dict(question=question))
+#     print(answer)
+
+
 def example_document_qa():
-    c = Capability("multi/document_qa")
+    c = Capability("blazon/document_qa")
     question = "Who formed the Carborundum Company?"
     answer = c(EXAMPLE_PASSAGE, question)
-    print(dict(question=question))
-    print(answer)
-    question = "What colors were emitted by the first LED crystal?"
-    answer = c(EXAMPLE_PASSAGE, question)
-    print(dict(question=question))
-    print(answer)
+    print("Result: ", answer)
+    print(
+        "Formatted result: ",
+        "- " + "\n- ".join(bp["bullet_point"] for bp in answer["answer"]["claims"]),
+    )
 
 
 def example_search():
-    c = Capability("multi/search")
+    c = Capability("blazon/search")
     print(c("Who discovered the useful properties of silicon carbide?"))
 
 
@@ -89,7 +100,7 @@ def parse_table():
     instructions: str = """\
     Given the following `unstructured_table` ASCII representation of a table, parse it into a list of rows where each row is a list of cells, consisting of the contents of each cell of the `unstructured_table` with all trailing and leading whitespace stripped."""
 
-    c = Capability("multi/structured")
+    c = Capability("blazon/structured")
 
     unstructured_table = """\
 |mathqa        |      0|acc     |  0.2500|_  | 0.0435|
@@ -136,7 +147,7 @@ def test_factorization():
         print(f"running_product={running_product}")
         return input.value == running_product
 
-    c = Capability("multi/structured")
+    c = Capability("blazon/structured")
 
     import random
 
@@ -163,7 +174,7 @@ def structured_chain_of_thought():
     class Output(BaseModel):
         output: str
 
-    c = Capability("multi/structured")
+    c = Capability("blazon/structured")
 
     def generate_chain_of_thought(input: Input) -> ChainOfThought:
         cot_instructions = """\
@@ -217,14 +228,83 @@ def example_translation():
     instructions = "Given the input `text`, produce a `french_translation` which translates the `text` into French. Also produce a word-level translation called `word_translations`, which is a list of (english word, french transliteration) pairs."
 
     # print the task to console
-    result = Capability("multi/structured")(InputText, TranslationOutput, instructions, inp)
+    result = Capability("blazon/structured")(InputText, TranslationOutput, instructions, inp)
     import json
 
     print(json.dumps(result.dict(), indent=2))
 
 
 def example_summarize():
-    print(Capability("multi/summarize")(EXAMPLE_PASSAGE))
+    print(Capability("blazon/summarize")(EXAMPLE_PASSAGE))
+
+
+class Link(BaseModel):
+    text: str
+    href: str
+
+
+class Links(BaseModel):
+    links: List[Link]
+
+
+class SortedIndices(BaseModel):
+    sorted_indices: List[int]
+
+
+def example_link_permutations(topic: str, input: Links) -> SortedIndices:
+
+    instructions = f"""\
+Given the input list of `links`, return a list of `sorted_indices` which reorders `links` from most relevant to least relevant for {topic}. `sorted_indices` must contain all integers from 0 to len(`links`) - 1, and `sorted_indices[0]` must be the most relevant link and `sorted_indices[-1]` must be the least relevant link.
+    """
+
+    indices = Capability("blazon/summarize")(
+        Links, SortedIndices, instructions, input
+    ).sorted_indices
+
+    return [input[i] for i in indices]
+
+
+def example_selenium():
+    class SynthesisRequest(BaseModel):
+        goal: str
+        url: str
+        title: str
+
+    class SynthesisResponse(BaseModel):
+        python_code_with_imports: str
+
+    instructions: str = """\
+    Given the input synthesis request, return a complete Python script with imports using Selenium to accomplish the user's `goal` against the website with `url` and `title`. Make sure to use the latest version of Selenium.
+    Use the CSS selector if possible by using the `find_element(By.CSS_SELECTOR, ...)` pattern.
+    The Python script should contain a single declaration which is a function parametrized by a "query: str".
+    """
+
+    input: SynthesisRequest = SynthesisRequest(
+        goal="Retrieve the first three paragraphs",
+        url="https://en.wikipedia.org/wiki/Selenium_(software)",
+        title="Google",
+    )
+
+    print(
+        Capability("blazon/structured")(
+            SynthesisRequest, SynthesisResponse, instructions, input=input
+        ).python_code_with_imports
+    )
+
+
+def make_paragraph(bullet_points: List[str]) -> str:
+    class BulletPoints(BaseModel):
+        bullet_points: List[str]
+
+    class Summary(BaseModel):
+        summary: str
+
+    return Capability("blazon/structured")(
+        BulletPoints,
+        Summary,
+        "Combine the `bullet_points` into a paragraph-length summary. Use only information which is in the `bullet_points`. Ensure the final `summary` is crisp, professional, and flows well.",
+        BulletPoints(bullet_points=bullet_points),
+    ).summary
 
 
 # example usage: python -m capabilities.example example_translation
