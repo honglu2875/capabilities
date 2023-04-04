@@ -6,5 +6,5 @@ Blazon Capabilities SDK
 
 ```bash
 pip install -e . # installs `capabilities`
-python -m capabilities.example
+python -m capabilities.example example_structured
 ```
