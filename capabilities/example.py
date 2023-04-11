@@ -230,6 +230,7 @@ def example_translation():
     # print the task to console
     result = Capability("blazon/structured")(InputText, TranslationOutput, instructions, inp)
     import json
+
     print(json.dumps(result.dict(), indent=2))
 
 
@@ -318,4 +319,5 @@ def make_paragraph(bullet_points: List[str]) -> str:
 # example usage: python -m capabilities.example example_translation
 if __name__ == "__main__":
     import sys
+
     fire.Fire(component=locals()[sys.argv[1]], command=sys.argv[2:])

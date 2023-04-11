@@ -64,9 +64,6 @@ class DocumentQA(CapabilityBase):
                     "query": query,
                 }
                 resp = requests.post(url=url, headers=headers, json=payload)
-                import curl
-
-                curl.parse(resp)
                 return resp.json()
             except:
                 sleep_duration = 2.0**count
