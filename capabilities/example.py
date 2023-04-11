@@ -230,7 +230,6 @@ def example_translation():
     # print the task to console
     result = Capability("blazon/structured")(InputText, TranslationOutput, instructions, inp)
     import json
-
     print(json.dumps(result.dict(), indent=2))
 
 
@@ -270,13 +269,22 @@ def example_selenium():
         url: str
         title: str
 
+    class Declaration(BaseModel):
+        name: str
+        type_signature: str
+        code: str
+
     class SynthesisResponse(BaseModel):
-        python_code_with_imports: str
+        imports: List[str]
+        declarations: List[Declaration]
+        entry_point: Declaration
 
     instructions: str = """\
     Given the input synthesis request, return a complete Python script with imports using Selenium to accomplish the user's `goal` against the website with `url` and `title`. Make sure to use the latest version of Selenium.
+    The `imports` must be a list of Python imports to be placed at the top of  the file.
     Use the CSS selector if possible by using the `find_element(By.CSS_SELECTOR, ...)` pattern.
-    The Python script should contain a single declaration which is a function parametrized by a "query: str".
+    The `declarations` are function definitions and classes necessary for defining the entry point.
+    The Python script should contain a single entry point called `_main` which is a function parametrized by a "query: str".
     """
 
     input: SynthesisRequest = SynthesisRequest(
@@ -288,7 +296,7 @@ def example_selenium():
     print(
         Capability("blazon/structured")(
             SynthesisRequest, SynthesisResponse, instructions, input=input
-        ).python_code_with_imports
+        ).dict()
     )
 
 
@@ -310,5 +318,4 @@ def make_paragraph(bullet_points: List[str]) -> str:
 # example usage: python -m capabilities.example example_translation
 if __name__ == "__main__":
     import sys
-
     fire.Fire(component=locals()[sys.argv[1]], command=sys.argv[2:])

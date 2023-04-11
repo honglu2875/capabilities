@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "capabilities"
 version = "0.0.8"
 authors = [
-  { name="Multi Technologies Inc.", email="hello@llm.llc" },
+  { name="Blazon AI", email="support@blazon.ai" },
 ]
 description = ""
 readme = "README.md"
@@ -21,5 +21,5 @@ dependencies = [
              "pdfminer.six",
              "tiktoken",
              "blobfile",
-             "multiflow-python",
+             "pydantic",
 ]
