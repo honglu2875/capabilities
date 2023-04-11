@@ -3,7 +3,6 @@ import dataclasses
 import dacite
 from dataclasses import dataclass, field, is_dataclass
 from typing import Dict, Any, List, Union
-import multiflow
 from typing import Optional
 import requests
 import aiohttp
@@ -57,7 +56,7 @@ class DocumentQA(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/blazon/documentqa"
+                url = "https://api.blazon.ai/blazon/documentqa"
                 headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
                 payload = {
                     "document": document,
@@ -78,7 +77,7 @@ class DocumentQA(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/blazon/documentqa"
+                url = "https://api.blazon.ai/blazon/documentqa"
                 if session is None:
                     async with aiohttp.ClientSession(
                         connector=aiohttp.TCPConnector(ssl=False)
@@ -108,7 +107,7 @@ class DocumentQA(CapabilityBase):
 @dataclass
 class Summarize(CapabilityBase):
     """
-    Class for summarizing text using an API call to https://api.multi.dev/blazon/summarize.
+    Class for summarizing text using an API call to https://api.blazon.ai/blazon/summarize.
 
     Args:
         CapabilityBase (class): Base class for all capabilities.
@@ -137,7 +136,7 @@ class Summarize(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/blazon/summarize"
+                url = "https://api.blazon.ai/blazon/summarize"
                 headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
                 payload = {
                     "document": document,
@@ -157,7 +156,7 @@ class Summarize(CapabilityBase):
         count = 0
         while count < patience:
             try:
-                url = "https://api.multi.dev/blazon/summarize"
+                url = "https://api.blazon.ai/blazon/summarize"
                 if session is None:
                     async with aiohttp.ClientSession(
                         connector=aiohttp.TCPConnector(ssl=False)
@@ -184,66 +183,6 @@ class Summarize(CapabilityBase):
         raise Exception("[Summarize] failed after hitting max retries")
 
 
-@dataclass
-class Sql(CapabilityBase):
-    headers: Dict[Any, Any] = field(
-        default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
-    )
-    url: str = "https://api.multi.dev/blazon/sql"
-
-    def __call__(self, query: str, sql_schema: str, sql_variant: Optional[str] = "vanilla"):
-        payload = dict(query=query, sql_schema=sql_schema, sql_type=sql_variant)
-        r = requests.post(self.url, headers=self.headers, json=payload)
-        return r.json()
-
-    async def run_async(
-        self, query: str, sql_schema: str, sql_variant: Optional[str] = "vanilla", session=None
-    ):
-        if session is None:
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-                async with session.post(
-                    self.url,
-                    headers=self.headers,
-                    json=dict(query=query, sql_schema=sql_schema, sql_type=sql_variant),
-                ) as resp:
-                    result = await resp.json()
-                    return result
-        else:
-            async with session.post(self.url, headers=self.headers, json=dict(query=query)) as resp:
-                result = await resp.json()
-                return result
-
-
-@dataclass
-class Search(CapabilityBase):
-    """
-    Run a web search, summarizing the top results.
-    """
-
-    headers: Dict[Any, Any] = field(
-        default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
-    )
-    url: str = "https://api.multi.dev/blazon/search"
-
-    def __call__(self, query: str):
-        payload = dict(query=query)
-        r = requests.post(self.url, headers=self.headers, json=payload)
-        return r.json()
-
-    async def run_async(self, query: str, session=None):
-        if session is None:
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-                async with session.post(
-                    self.url, headers=self.headers, json=dict(query=query)
-                ) as resp:
-                    result = await resp.json()
-                    return result
-        else:
-            async with session.post(self.url, headers=self.headers, json=dict(query=query)) as resp:
-                result = await resp.json()
-                return result
-
-
 def flatten_model(m: Union[ModelMetaclass, str, bool, float, int]):
     if hasattr(m, "__dict__"):
         if m.__dict__.get("_name") == "List":
@@ -260,33 +199,6 @@ def flatten_model(m: Union[ModelMetaclass, str, bool, float, int]):
         return "int"
     else:
         raise Exception(f"unsupported datatype={m}")
-
-
-@dataclass
-class WebContent(CapabilityBase):
-    def __call__(self, url):
-        endpoint_url = (
-            f"https://chrome.browserless.io/content?token={os.environ.get('BROWSERLESS_API_KEY')}"
-        )
-
-        payload = {"url": url}
-
-        headers = {"Content-Type": "application/json", "Cache-Control": "no-cache"}
-        response = requests.post(endpoint_url, json=payload, headers=headers)
-        return Document(response._content.decode("utf-8")).content()
-
-    async def run_async(self, url, session=None):
-        if session is None:
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-                return await self.run_async(url, session=session)
-        else:
-            payload = {"url": url}
-            endpoint_url = f"https://chrome.browserless.io/content?token={os.environ.get('BROWSERLESS_API_KEY')}"
-            headers = {"Content-Type": "application/json", "Cache-Control": "no-cache"}
-            async with session.post(endpoint_url, headers=headers, json=payload) as resp:
-                result = (await resp.content.read()).decode("utf-8")
-                return Document(result).summary()
-
 
 @dataclass
 class Structured(CapabilityBase):
@@ -306,8 +218,7 @@ class Structured(CapabilityBase):
     headers: Dict[Any, Any] = field(
         default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
     )
-    url: str = "https://api.multi.dev/blazon/structured"
-    # url: str = "https://multi-api-3lt5g6vshq-uc.a.run.app/structured"
+    url: str = "https://api.blazon.ai/blazon/structured"
 
     def __call__(
         self,
