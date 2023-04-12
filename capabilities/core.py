@@ -2,7 +2,7 @@ import os
 import dataclasses
 import dacite
 from dataclasses import dataclass, field, is_dataclass
-from typing import Dict, Any, List, Union
+from typing import Dict, Any, List, Union, Literal
 from typing import Optional
 import requests
 import aiohttp
@@ -183,7 +183,7 @@ class Summarize(CapabilityBase):
         raise Exception("[Summarize] failed after hitting max retries")
 
 
-def flatten_model(m: Union[ModelMetaclass, str, bool, float, int]):
+def flatten_model(m: Union[ModelMetaclass, str, bool, float, int]) -> Dict[Any, Any]:
     if hasattr(m, "__dict__"):
         if m.__dict__.get("_name") == "List":
             return [flatten_model(m.__args__[0])]
@@ -234,6 +234,7 @@ class Structured(CapabilityBase):
             input=dataclasses.asdict(input) if is_dataclass(input) else input.dict(),
         )
         r = requests.post(self.url, headers=self.headers, json=payload)
+        print("R: ", r)
         result = r.json()["output"]
         return (
             output_spec.parse_obj(result)

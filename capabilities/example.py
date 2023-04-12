@@ -294,6 +294,8 @@ def example_selenium():
         title="Google",
     )
 
+    
+
     print(
         Capability("blazon/structured")(
             SynthesisRequest, SynthesisResponse, instructions, input=input
