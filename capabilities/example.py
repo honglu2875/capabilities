@@ -3,6 +3,7 @@ from capabilities import Capability
 from pydantic import BaseModel
 from typing import List
 
+
 EXAMPLE_PASSAGE = """\
 Wide-scale production is credited to Edward Goodrich Acheson in 1890.[11] Acheson was attempting to prepare artificial diamonds when he heated a mixture of clay (aluminium silicate) and powdered coke (carbon) in an iron bowl. He called the blue crystals that formed carborundum, believing it to be a new compound of carbon and aluminium, similar to corundum. Moissan also synthesized SiC by several routes, including dissolution of carbon in molten silicon, melting a mixture of calcium carbide and silica, and by reducing silica with carbon in an electric furnace. Acheson patented the method for making silicon carbide powder on February 28, 1893.[12] Acheson also developed the electric batch furnace by which SiC is still made today and formed the Carborundum Company to manufacture bulk SiC, initially for use as an abrasive.[13] In 1900 the company settled with the Electric Smelting and Aluminum Company when a judge's decision gave "priority broadly" to its founders "for reducing ores and other substances by the incandescent method".[14] It is said that Acheson was trying to dissolve carbon in molten corundum (alumina) and discovered the presence of hard, blue-black crystals which he believed to be a compound of carbon and corundum: hence carborundum. It may be that he named the material "carborundum" by analogy to corundum, which is another very hard substance (9 on the Mohs scale). The first use of SiC was as an abrasive. This was followed by electronic applications. In the beginning of the 20th century, silicon carbide was used as a detector in the first radios.[15] In 1907 Henry Joseph Round produced the first LED by applying a voltage to a SiC crystal and observing yellow, green and orange emission at the cathode. The effect was later rediscovered by O. V. Losev in the Soviet Union in 1923.[16]\
 """
@@ -77,11 +78,6 @@ def example_document_qa():
         "Formatted result: ",
         "- " + "\n- ".join(bp["bullet_point"] for bp in answer["answer"]["claims"]),
     )
-
-
-def example_search():
-    c = Capability("blazon/search")
-    print(c("Who discovered the useful properties of silicon carbide?"))
 
 
 def parse_table():
@@ -252,7 +248,6 @@ class SortedIndices(BaseModel):
 
 
 def example_link_permutations(topic: str, input: Links) -> SortedIndices:
-
     instructions = f"""\
 Given the input list of `links`, return a list of `sorted_indices` which reorders `links` from most relevant to least relevant for {topic}. `sorted_indices` must contain all integers from 0 to len(`links`) - 1, and `sorted_indices[0]` must be the most relevant link and `sorted_indices[-1]` must be the least relevant link.
     """
@@ -321,5 +316,4 @@ def make_paragraph(bullet_points: List[str]) -> str:
 # example usage: python -m capabilities.example example_translation
 if __name__ == "__main__":
     import sys
-
     fire.Fire(component=locals()[sys.argv[1]], command=sys.argv[2:])
