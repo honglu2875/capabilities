@@ -1,12 +1,18 @@
 import logging
 from typing import Sequence
-from ..types import EmbeddingModel
-from sentence_transformers import SentenceTransformer
+from .types import EmbeddingModel
 from hashlib import blake2b
-from ..util import batched, cache
+from .util import batched, cache
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ModuleNotFoundError:
+    raise ModuleNotFoundError(
+        "In order to use sentence-transformer modules, please run `pip install sentence-transformers`"
+    )
 
 """
-This file contains huggingface SentenceTransformer models.
+This file contains SentenceTransformer models.
 """
 
 logger = logging.getLogger(__name__)
@@ -30,11 +36,11 @@ class STEmbeddingModel(EmbeddingModel):
     def tokenize(self, text: str) -> list[int]:
         return self.model.tokenizer.encode(text)  # type: ignore
 
-    def detokenize(self, tokens: list[int]):
+    def detokenize(self, tokens: list[int]) -> str:
         # first and last tokens are special tokens
         # [todo] filter special tokens instead
         tokens = tokens[1:-1]
-        return self.model.tokenizer.decode(tokens)
+        return self.model.tokenizer.decode(tokens)  # type: ignore
 
     @property
     def max_tokens(self):

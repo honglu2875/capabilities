@@ -5,8 +5,8 @@ import pickle
 
 import pytest
 from capabilities.search import AbstractSearchIndex, create_document, EmbeddingModel
-from capabilities.search.models.hf import STEmbeddingModel
-from capabilities.search.models.oai import OpenAIEmbeddingModel
+from capabilities.search.hf import STEmbeddingModel
+from capabilities.search.oai import OpenAIEmbeddingModel
 from capabilities.search import SearchIndex
 from capabilities.search.nomic_index import NomicIndex
 
@@ -44,11 +44,15 @@ def test_search_e2e(search_index: AbstractSearchIndex, snapshot, tmp_path):
     data_dir = Path("examples/data")
     search_index.update([create_document(data_dir / "tesla10k.txt")])
     search_index.update([create_document(data_dir / "apple10k.pdf")])
-    results = list(search_index.search("Kimbal", limit=5))
+    results = search_index.search("Kimbal", limit=5)
+    assert isinstance(results, list)
+    scores = [r.score for r in results]
+    assert all(isinstance(s, float) for s in scores)
+    assert all(1.0 >= s >= 0.0 for s in scores), "scores not normalized between 0 and 1"
+    assert sorted(scores, reverse=True) == scores, "scores not in descending order"
     assert len(results) == 5
     r0 = results[0]
     r = pprint.pformat(asdict(r0))
-    # snapshot.assert_match(r, "r0.txt")
 
     # now save to disk
     snap_path = tmp_path / "snapshot.pkl"

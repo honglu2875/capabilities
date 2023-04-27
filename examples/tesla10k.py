@@ -1,32 +1,20 @@
-"""
-
-In this example, we are going to make a QA bot for big text documents.
-
-
-"""
-import asyncio
-import gzip
 from pathlib import Path
 import re
-from typing import Literal
 
-from pydantic import BaseModel
 from capabilities.search import *
-import ndjson
 from rich import print
 from rich.prompt import Prompt
 from rich.panel import Panel
-from capabilities.search.models.hf import STEmbeddingModel
-from capabilities.search.models.oai import OpenAIEmbeddingModel
+from capabilities.search.hf import STEmbeddingModel
 from pathlib import Path
 from capabilities.search.loader import create_document, Document
 from capabilities.search.nomic_index import NomicIndex
 
 # %%
-# First lets create an index.
-
+# Let's create an index.
 
 data_dir = Path("examples/data")
+
 index = NomicIndex[Document](
     embedding_model=STEmbeddingModel(), project_name="tesla10k"
 )
@@ -51,9 +39,7 @@ while True:
         assert r is not None
         assert chunk_id is not None
         text = result.get_text()
-        text = re.sub(r"\n", " ", text)  # tidy up
+        text = re.sub(r"\n", " ", text)  # tidy up newlines
         print(f"[bold blue]{result.id}/{chunk_id}[/], ", "score =", result.score)
-        print()
         print(Panel(text))
         print()
-# %%

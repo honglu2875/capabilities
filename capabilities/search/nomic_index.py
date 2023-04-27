@@ -1,13 +1,22 @@
+import math
 from typing import Generic, Iterable, Literal, Optional, TypeVar, get_args
 from .search_index import AbstractSearchIndex, SearchResult, get_chunks
-from .types import TextItem, get_text, Chunk
+from .types import EmbeddingModel, TextItem, get_text, Chunk
 import numpy as np
-from nomic import atlas
+
+try:
+    from nomic import atlas
+except ModuleNotFoundError:
+    raise ModuleNotFoundError(
+        "To use Nomic vector search, please install the python package using `pip install nomic`"
+    )
 
 T = TypeVar("T", bound=TextItem)
 
 
 class NomicIndex(Generic[T], AbstractSearchIndex[T]):
+    """Search index using Nomic Atlas."""
+
     project: atlas.AtlasProject
     modality: Literal["text", "embedding"]
     items: dict[str, T]
@@ -16,12 +25,27 @@ class NomicIndex(Generic[T], AbstractSearchIndex[T]):
     def __init__(
         self,
         *,
-        embedding_model=None,
+        embedding_model: Optional[EmbeddingModel] = None,
         project_name: str,
-        map_name="index",
         items: Optional[Iterable[T]] = None,
+        reset_project_if_exists: bool = True,
         **kwargs,
     ):
+        """
+        Creates a new Nomic index.
+
+        Note that this will create a new Nomic Atlas project if one does not already exist.
+        In the case that the index already exists, the data will be wiped from it unless reset_project_if_exists is set to False.
+
+        Before initialising `NomicIndex`, please make sure that you have logged in to Nomic, you can do this by typing `nomic login` into the terminal.
+
+
+        Args:
+          - project_name (str): name of the nomic project to use
+          - embedding_model (EmbeddingModel, optional): the model to use for the index. Default is SentenceTransformer miniLM.
+          - reset_project_if_exists (bool = False): whether to reset the project if it already exists. Defaults to True.
+          - items (Iterable[T], optional): an iterable of items that will be used to update the index. If this is set, equivalent to calling `index.update(items)` after initialization.
+        """
         self.embedding_model = embedding_model
         self.modality = "text" if embedding_model is None else "embedding"
         self.project = atlas.AtlasProject(
@@ -29,8 +53,7 @@ class NomicIndex(Generic[T], AbstractSearchIndex[T]):
             **kwargs,
             modality=self.modality,
             unique_id_field="id",
-            # [todo] should it reset?
-            reset_project_if_exists=True,
+            reset_project_if_exists=reset_project_if_exists,
         )
         self.project_id = self.project.id
         self.items = {}
@@ -60,13 +83,13 @@ class NomicIndex(Generic[T], AbstractSearchIndex[T]):
 
     @property
     def index(self):
-        # if self.project.total_datums < 20:
-        #     raise RuntimeError(
-        #         "Nomic does not yet have enough data to index. Please make sure there are at least 20 datapoints."
-        #     )
+        if len(self.chunks) < 20:
+            raise RuntimeError(
+                "Nomic does not yet have enough data to index. Please make sure there are at least 20 datapoints."
+            )
         if len(self.project.indices) == 0:
             return self.project.create_index(
-                name="an-index", colorable_fields=["item_id"]
+                name="main-index", colorable_fields=["item_id"]
             )
         else:
             return self.project.indices[0].projections[0]  # idk
@@ -92,23 +115,34 @@ class NomicIndex(Generic[T], AbstractSearchIndex[T]):
         self,
         query: str,
         limit: int = 5,
-    ):
+    ) -> list[SearchResult[T]]:
         if self.embedding_model is not None:
             embedding = self.embedding_model.encode([query])
             idx = self.index
             with self.project.wait_for_project_lock():
-                ids, scores = idx.vector_search(queries=embedding, k=limit)
-                for id, score in zip(ids[0], scores[0]):
+                # note, Nomic scores using distance: lower is closer.
+                ids, distances = idx.vector_search(queries=embedding, k=limit)
+                assert len(ids) == embedding.shape[0] == len(distances)
+
+                def mk(id, distance):
                     chunk = self.chunks[id]
                     item = self.items[chunk.item_id]
-                    yield SearchResult(
+                    # invert score with atan to get a score clamped between 0 and 1 that increases with similarity
+                    score = 1.0 - (math.atan(distance) * 2.0 / math.pi)
+                    return SearchResult(
                         item=item,
-                        score=score,  # type: ignore
+                        score=score,
                         chunk_id=chunk.chunk_id,
                         substring_range=chunk.substring_range,
                     )
+
+                items = [mk(id, score) for id, score in zip(ids[0], distances[0])]
+                return items
+
         else:
-            raise NotImplementedError("doesn't seem to be a direct text search api")
+            raise NotImplementedError(
+                "search on a text-mode Nomic index is not yet implemented."
+            )
 
     def __len__(self):
         raise NotImplementedError("todo")

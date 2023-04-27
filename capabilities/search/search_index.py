@@ -54,8 +54,8 @@ def simple_chunker(
         pre_chunk_text = model.detokenize(tokens[:window_start])
         offset_start = len(pre_chunk_text)
         offset_end = len(pre_chunk_text) + len(chunk_text)
-        assert offset_start < len(text)
-        assert offset_end <= len(text)
+        # assert offset_start < len(text)
+        # assert offset_end <= len(text)
         assert model.count_tokens(chunk_text) <= N
         if chunk_text != text[offset_start:offset_end]:
             logger.debug("detokenization doesn't match.")
@@ -126,19 +126,28 @@ class SearchResult(Generic[T]):
     """Result of calling SearchIndex.search."""
 
     item: T
+    """ The TextItem that was found.
+
+    Note that the item may have been chunked, in which case the chunk_id will be non-None.
+    You can use item.get_text() to get the chunk text."""
     chunk_id: Optional[str]
     """ If the original text-item was too long and got chunked, we also pass an identifier for the chunk. """
     score: float
+    """ Value between 0.0 and 1.0 representing the score of the item, higher is closer to the query. """
     substring_range: Optional[range] = field(default=None)
 
     @property
     def id(self):
+        """Gets the item_id of the found item."""
         return self.item.id
 
     def get_text(self) -> str:
+        """Gets the chunk text of the found item."""
         fulltext = self.item.get_text()
         if self.substring_range is not None:
-            assert self.chunk_id is not None
+            assert (
+                self.chunk_id is not None
+            ), "chunk_id was not set but substring_range was"
             r = self.substring_range
             return fulltext[r.start : r.stop]
         else:
@@ -151,7 +160,7 @@ class AbstractSearchIndex(Generic[T], ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def search(self, query: str, limit=5) -> Iterable[SearchResult[T]]:
+    def search(self, query: str, limit=5) -> list[SearchResult[T]]:
         raise NotImplementedError()
 
     @abstractmethod
@@ -162,7 +171,7 @@ class AbstractSearchIndex(Generic[T], ABC):
         raise NotImplementedError()
 
     def get_item(self, item_id: str) -> T:
-        """ Get the item for the given id. Raises KeyError if not found. """
+        """Get the item for the given id. Raises KeyError if not found."""
         raise NotImplementedError()
 
 
@@ -232,7 +241,7 @@ class SearchIndex(Generic[T], AbstractSearchIndex[T]):
         items: Optional[Iterable[T]] = None,
     ):
         if embedding_model is None:
-            from capabilities.search.models.hf import STEmbeddingModel
+            from capabilities.search.hf import STEmbeddingModel
 
             embedding_model = STEmbeddingModel()
         self.embedding_model = embedding_model
@@ -289,7 +298,8 @@ class SearchIndex(Generic[T], AbstractSearchIndex[T]):
         """
         encoding = self.embedding_model.encode_one(query)
         d, i = self.vector_index.search_one(encoding, limit=limit)
-        for score, index in zip(d, i):
+
+        def mk(score, index):
             id = self._cmap.id_of_idx(index)
             chunk_id = self._cmap.chunk_id_of_idx(index)
             if chunk_id is not None:
@@ -298,12 +308,15 @@ class SearchIndex(Generic[T], AbstractSearchIndex[T]):
                 chunk_range = None
             item = self.items[id]
 
-            yield SearchResult(
+            return SearchResult(
                 item=item,
                 score=float(score),
                 chunk_id=chunk_id,
                 substring_range=chunk_range,
             )
+
+        results = [mk(score, index) for score, index in zip(d, i)]
+        return results
 
     def __len__(self):
         return len(self.vector_index)

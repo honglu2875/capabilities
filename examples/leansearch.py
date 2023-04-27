@@ -4,9 +4,6 @@ Theorem Semantic Search
 
 This example takes mathlib and produces a semantic search vector database. Nice.
 
-
-
-
 """
 
 import asyncio
@@ -15,18 +12,26 @@ from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel
-from armory import *
 import ndjson
 from rich import print
 from rich.prompt import Prompt
 from rich.panel import Panel
-from armory.models.hf import STEmbeddingModel
-from hitsave import memo
-from armory import SearchIndex
-from armory.search.nomic_index import NomicIndex
+from capabilities.search import SearchIndex, TextItem
+from capabilities.search.hf import STEmbeddingModel
+from capabilities.search.nomic_index import NomicIndex
 
-mathlib_decls_path = Path("downloads/mathlib.jsonl.gz")
+# %%
+# Preliminaries: download mathlib.jsonl.gz
 
+mathlib_decls_url = "https://drive.google.com/file/d/1N3qrxx0vHRDUeTWESuXFgabqCqF3I5tE/view?usp=share_link"
+mathlib_decls_path = Path("examples/downloads/mathlib.jsonl.gz")
+if not mathlib_decls_path.exists():
+    raise FileNotFoundError(
+        f"Please visit {mathlib_decls_url} and store the file at {mathlib_decls_path}"
+    )
+
+# %%
+# Define a new TextItem class for mathlib declarations.
 
 class MathlibDecl(BaseModel, TextItem):
     formal_statement: str
@@ -44,19 +49,11 @@ class MathlibDecl(BaseModel, TextItem):
     def id(self):
         return self.name
 
-
 # %%
 # Loading the data
 # ----------------
 #
 # Let's grab the data from a file on gdrive.
-
-if not mathlib_decls_path.exists():
-    import gdown
-
-    # [todo] double check the link works
-    mathlib_gdrive_url = "https://drive.google.com/file/d/1N3qrxx0vHRDUeTWESuXFgabqCqF3I5tE/view?usp=share_link"
-    gdown.download(mathlib_gdrive_url, str(mathlib_decls_path), quiet=False)
 
 with gzip.open(mathlib_decls_path, "rt") as f:
     mathlib_decls = list(map(MathlibDecl.parse_obj, ndjson.reader(f)))
@@ -67,7 +64,6 @@ print(f"Found {len(mathlib_decls)} mathlib decls")
 
 # %%
 # Now let's create a semantic search vector database.
-
 
 vdb = NomicIndex[MathlibDecl](
     embedding_model=STEmbeddingModel(),

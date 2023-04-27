@@ -6,8 +6,8 @@ import aiohttp
 import numpy as np
 from pydantic import BaseModel, BaseSettings, Field, SecretStr
 import tiktoken
-from ..types import EmbeddingModel
-from ..util import argbatch, cache
+from .types import EmbeddingModel
+from .util import argbatch, cache
 from diskcache import Cache
 from rich.progress import track
 import requests
