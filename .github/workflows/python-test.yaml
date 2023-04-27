@@ -11,6 +11,8 @@ jobs:
   test-capabilities:
     name: "Python test"
     runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - uses: actions/checkout@v3
       - name: Set up pip cache
