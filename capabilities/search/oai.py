@@ -1,14 +1,13 @@
 """ Open AI API client. """
 
 from datetime import datetime
+import json
 from typing import Literal, Optional, Union
-import aiohttp
 import numpy as np
 from pydantic import BaseModel, BaseSettings, Field, SecretStr
 import tiktoken
 from .types import EmbeddingModel
 from .util import argbatch, cache
-from diskcache import Cache
 from rich.progress import track
 import requests
 
@@ -28,7 +27,6 @@ class OpenAISettings(BaseSettings):
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key.get_secret_value()}",
-            "User-Agent": f"aiohttp={aiohttp.__version__}",
         }
         return headers
 
@@ -118,8 +116,10 @@ class EmbeddingResponse(BaseModel):
 @cache.memoize()
 def embeddings(params: EmbeddingRequest) -> EmbeddingResponse:
     resp = OpenAISettings().post("/v1/embeddings", json=params.dict(exclude_none=True))  # type: ignore
-    resp.raise_for_status()
     j = resp.json()
+    if resp.status_code // 100 == 4:
+        raise RuntimeError(f"{resp.status_code}: {json.dumps(j, indent=2)}")
+    resp.raise_for_status()
     r = EmbeddingResponse.parse_obj(j)
     return r
 

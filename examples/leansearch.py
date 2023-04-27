@@ -65,10 +65,9 @@ print(f"Found {len(mathlib_decls)} mathlib decls")
 # %%
 # Now let's create a semantic search vector database.
 
-vdb = NomicIndex[MathlibDecl](
+vdb = SearchIndex[MathlibDecl](
     embedding_model=STEmbeddingModel(),
     items=mathlib_decls,
-    project_name="leansearch",
 )
 
 
