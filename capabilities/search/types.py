@@ -68,10 +68,21 @@ class TextItem(ABC):
     You can control how text should be chunked by providing a `chunk()` method.
     """
 
-    @abstractproperty
+    @cached_property
+    def digest(self) -> str:
+        """Returns the blake2b digest of the item's text as a hex string."""
+        return digest(self.get_text())
+
+    @property
     def id(self) -> str:
-        """Returns a unique identifier for the item."""
-        raise NotImplementedError()
+        """Returns a unique identifier for the item.
+
+        By default, this is the blake2b digest of the item's text.
+        We recommend overriding this with an id that better reflects the semantics of the document.
+        For example, if the TextItem represents a webpage, choose the id to be the URL of the page.
+        """
+        # note that 36 is chosen because nomic does not like having long ids.
+        return self.digest[:36]
 
     @abstractmethod
     def get_text(self) -> str:
@@ -108,7 +119,13 @@ class EmbeddingModel(ABC):
 
     @abstractmethod
     def tokenize(self, text: str) -> list[int]:
-        """Run tokenizer on given text."""
+        """Run tokenizer on given text.
+
+        This is used by the chunking algorithm to produce sufficiently small chunks.
+
+        Returns:
+          tokens: list[int] a list of token input ids.
+        """
         raise NotImplementedError()
 
     @abstractmethod
