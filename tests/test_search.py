@@ -3,10 +3,12 @@ import pprint
 from dataclasses import asdict
 import pickle
 
+import requests
+
 import pytest
 from capabilities.search import AbstractSearchIndex, create_document, EmbeddingModel
 from capabilities.search.hf import STEmbeddingModel
-from capabilities.search.oai import OpenAIEmbeddingModel
+from capabilities.search.oai import OpenAIEmbeddingModel, OpenAISettings
 from capabilities.search import SearchIndex
 from capabilities.search.nomic_index import NomicIndex
 
@@ -20,6 +22,16 @@ def embedding_model(request):
         yield STEmbeddingModel(param)
     elif param == "openai":
         # [todo] if no api key skip this one.
+        try:
+            OpenAISettings()  # type: ignore
+            m = OpenAIEmbeddingModel()
+            m.encode_one("hello world")
+            yield m
+        except requests.HTTPError as e:
+            pytest.skip(f"embedding model gave {e.response.status_code}")
+        except Exception:
+            pytest.skip("OpenAI API key not set")
+
         yield OpenAIEmbeddingModel()
     else:
         raise ValueError(f"Unknown param {param}")

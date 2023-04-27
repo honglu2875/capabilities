@@ -118,7 +118,7 @@ def embeddings(params: EmbeddingRequest) -> EmbeddingResponse:
     resp = OpenAISettings().post("/v1/embeddings", json=params.dict(exclude_none=True))  # type: ignore
     j = resp.json()
     if resp.status_code // 100 == 4:
-        raise RuntimeError(f"{resp.status_code}: {json.dumps(j, indent=2)}")
+        raise requests.HTTPError(f"{resp.status_code}: {json.dumps(j, indent=2)}", response = resp)
     resp.raise_for_status()
     r = EmbeddingResponse.parse_obj(j)
     return r
