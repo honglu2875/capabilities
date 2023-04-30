@@ -58,19 +58,7 @@ Write a bullet-pointed summary of the `text` as a list of supported bullet point
     for x in document_summary.supportedBulletPoints:
         print(f"claim: {x.bullet_point}")
         print(f'    support: """{x.supporting_text}"""\n')
-
-
-# def example_document_qa():
-#     c = Capability("blazon/document_qa")
-#     question = "Who formed the Carborundum Company?"
-#     answer = c(EXAMPLE_PASSAGE, question)
-#     print(dict(question=question))
-#     print(answer)
-#     question = "What colors were emitted by the first LED crystal?"
-#     answer = c(EXAMPLE_PASSAGE, question)
-#     print(dict(question=question))
-#     print(answer)
-
+        
 
 def example_document_qa():
     c = Capability("blazon/document_qa")
@@ -164,6 +152,7 @@ def structured_chain_of_thought():
     class ChainOfThought(BaseModel):
         thoughts: List[List[str]]
         conclusion: str
+
         meta_conclusion: str
 
     class CombinedInputOutput(BaseModel):
@@ -315,6 +304,57 @@ def make_paragraph(bullet_points: List[str]) -> str:
         BulletPoints(bullet_points=bullet_points),
     ).summary
 
+
+def synth_app(instructions: str):
+    class Instruction(BaseModel):
+        instruction: str
+
+    class PartialWebsiteElement(BaseModel):
+        html_tag: str
+        parameters: List[str]
+        instruction: str
+
+    class Plan(BaseModel):
+        top_level_description: str # model-generated description of what the end result should look like
+        partial_elements: List[PartialWebsiteElement]
+
+    instruction = """\
+    Given the user `instruction` for a website to build in HTML, write a plan with a paragraph-length `top_level_description` for the overall structure and look and feel of the website, and a comprehensive list of `partial_elements`, each of which contains an `html_tag` for that element, `parameters` to be passed as arguments to the tag, and an `instruction` specifying that element of the final HTML document. Phrase the `instruction` as an instruction to a software engineer who will fully implement the element. The `partial_elements` should include headers, footers, and should use inline tailwind CSS styling. Use Javascript as necessary. Do not create SVG elements.
+    """
+
+    input = Instruction(instruction=instructions)
+    output = Capability("blazon/structured")(Instruction, Plan, instruction, input)
+
+    print("top-level: ", output.top_level_description)
+    for pe in output.partial_elements:
+        print(pe)
+
+    from concurrent import futures
+
+    def generate_html_element(p1: Plan, p2: PartialWebsiteElement):
+        instruction = "Given the `plan`, implement the `partial_website_element` as a `complete_html_element`. Implement the `instruction`. Fully implement the `instruction` and do not leave placeholders or comments. Do not repeat the `instruction`. Fill in all missing content and add code for e.g. Javascript, connecting to external APIs, and databases as necessary. Link to nonexistent website, social media profiles, and make up contact information and legal disclaimers as needed."
+
+        class Plan2(BaseModel):
+            plan: Plan
+            partial_website_element: PartialWebsiteElement
+
+        class HTMLElement(BaseModel):
+            html_element: str
+
+        return Capability("blazon/structured")(Plan2, HTMLElement, instruction, Plan2(plan=p1, partial_website_element=p2))
+
+    with futures.ThreadPoolExecutor(8) as pool:
+        html_elements = pool.map(lambda p: generate_html_element(output, p), output.partial_elements)
+
+    final_document = "\n".join(x.html_element for x in html_elements)
+
+    with open("test2.html", "w") as f:
+        f.write(final_document)
+
+    return final_document
+
+# from multisearch.trace_flow import if_json_spec_async
+# synthesize a plan / chain of thought using GPT4
 
 # example usage: python -m capabilities.example example_translation
 if __name__ == "__main__":

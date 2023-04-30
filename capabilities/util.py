@@ -6,6 +6,10 @@ import requests
 import openai
 import random
 import tiktoken
+import concurrent.futures
+from typing import Callable, List, Any, TypeVar, Iterable
+import time
+from threading import Thread
 
 ENCODER = tiktoken.get_encoding("p50k_base")
 
@@ -155,3 +159,25 @@ def text_embed(prompt):
     payload = {"input": prompt, "model": "text-embedding-ada-002"}
     r = requests.post("https://api.openai.com/v1/embeddings", headers=headers, json=payload)
     return r.json()["data"][0]["embedding"]
+
+T = TypeVar("T")
+
+def parallel_map(fn: Callable, xs: List[T], parallelism: int = 8) -> Iterable[T]:
+    results = [None] * len(xs)  # initialize with None
+    current_index = 0
+    def get_results():
+        with concurrent.futures.ThreadPoolExecutor(parallelism) as executor:
+            futures = [executor.submit(fn, x) for x in xs]
+
+            for future in concurrent.futures.as_completed(futures):
+                idx = futures.index(future)  # get index of current future
+                result = future.result()  # get result of current future
+                results[idx] = result  # insert result into proper index
+
+    t = Thread(target=get_results)
+    t.start()
+    while current_index < len(results):
+        if results[current_index] is not None:
+            yield results[current_index]
+            current_index += 1
+    t.join()

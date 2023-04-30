@@ -17,6 +17,7 @@ from .types import (
 )
 from .util import Bijection, argwindow, unzip
 import numpy as np
+from tqdm import tqdm
 
 T = TypeVar("T", bound=TextItem)
 
@@ -123,30 +124,32 @@ T = TypeVar("T", bound=TextItem)
 
 @dataclass
 class SearchResult(Generic[T]):
-    """Result of calling SearchIndex.search."""
+    """Result of calling SearchIndex.search.
+
+    Attributes:
+        item: The TextItem that was found. Note that the item may have been chunked, in which case the chunk_id will
+            be non-None. You can use item.get_text() to get the chunk text.
+        chunk_id: If the original text-item was too long and got chunked, we also pass an identifier for the chunk.
+        score: Value between 0.0 and 1.0 representing the score of the item, higher is closer to the query.
+        substring_range: Optional range specifying the substring range in the original text where the match occurred.
+        id: Property that gets the item_id of the found item.
+    """
 
     item: T
-    """ The TextItem that was found.
-
-    Note that the item may have been chunked, in which case the chunk_id will be non-None.
-    You can use item.get_text() to get the chunk text."""
     chunk_id: Optional[str]
-    """ If the original text-item was too long and got chunked, we also pass an identifier for the chunk. """
     score: float
-    """ Value between 0.0 and 1.0 representing the score of the item, higher is closer to the query. """
-    substring_range: Optional[range] = field(default=None)
+    substring_range: Optional[range] = None
 
     @property
-    def id(self):
+    def id(self) -> str:
         """Gets the item_id of the found item."""
         return self.item.id
 
     def get_text(self) -> str:
-        """Gets the chunk text of the found item."""
+        """Gets the chunk text or full text of the found item depending on the presence of substring_range."""
         fulltext = self.item.get_text()
         if self.substring_range is not None:
-            r = self.substring_range
-            return fulltext[r.start : r.stop]
+            return fulltext[self.substring_range.start:self.substring_range.stop]
         else:
             return fulltext
 
@@ -262,21 +265,22 @@ class SearchIndex(Generic[T], AbstractSearchIndex[T]):
         Raises:
             NotImplementedError: If updating items that already exist in the index. (we are working on it)
         """
-        items = list(items)
-        for item in items:
+        iterated_items = []
+        for item in tqdm(items):
             if item.id in self.items:
                 # [todo]
                 raise NotImplementedError(
                     "Updating items that already exist in the index is not currently supported."
                 )
             self.items[item.id] = item
-        texts = list(self._cmap.extend(get_chunks(items, self.embedding_model)))
+            iterated_items.append(item)
+        texts = list(self._cmap.extend(get_chunks(iterated_items, self.embedding_model)))
         embeddings: np.ndarray = self.embedding_model.encode(texts)
         assert len(texts) == len(embeddings)
         self.vector_index.add(embeddings)
         assert len(self.vector_index) == len(self._cmap)
         logger.debug(
-            f"Added {len(items)} items ({len(texts)} chunks) to the search index."
+            f"Added {len(iterated_items)} items ({len(texts)} chunks) to the search index."
         )
 
     def search(self, query: str, limit=5) -> Iterable[SearchResult]:

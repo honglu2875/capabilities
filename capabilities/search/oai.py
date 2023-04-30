@@ -136,6 +136,7 @@ def chat_completions(params: CompletionRequest) -> CompletionResponse:
 class OpenAIEmbeddingModel(EmbeddingModel):
     model_name = "text-embedding-ada-002"
     tokenizer_name = "cl100k_base"
+    chunk_size: int = 511
 
     def __init__(self):
         self.tokenizer = tiktoken.get_encoding(self.tokenizer_name)
@@ -148,7 +149,7 @@ class OpenAIEmbeddingModel(EmbeddingModel):
 
     @property
     def max_tokens_per_item(self) -> int:
-        return 8191
+        return self.chunk_size
 
     @property
     def dim(self) -> int:

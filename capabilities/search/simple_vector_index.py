@@ -46,7 +46,7 @@ class SimpleVectorIndex(VectorIndex):
             return d
 
     def add(self, arr):
-        assert len(arr.shape) == 2
+        assert len(arr.shape) == 2, f"arr.shape={arr.shape}"
         norm = np.linalg.norm(arr, axis=1)
         if np.any(norm == 0):
             raise ValueError("vector with norm 0 detected")
