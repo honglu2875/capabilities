@@ -54,7 +54,7 @@ class Chunk:
         return {
             "id": self.unique_id,
             "item_id": self.item_id,
-            "chunk_id": self.chunk_id,
+            "chunk_id": self.chunk_id if self.chunk_id is not None else "none",
             "text": self.text,
         }
 
