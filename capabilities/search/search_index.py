@@ -145,9 +145,6 @@ class SearchResult(Generic[T]):
         """Gets the chunk text of the found item."""
         fulltext = self.item.get_text()
         if self.substring_range is not None:
-            assert (
-                self.chunk_id is not None
-            ), "chunk_id was not set but substring_range was"
             r = self.substring_range
             return fulltext[r.start : r.stop]
         else:
