@@ -46,6 +46,10 @@ class NomicIndex(Generic[T], AbstractSearchIndex[T]):
           - reset_project_if_exists (bool = False): whether to reset the project if it already exists. Defaults to True.
           - items (Iterable[T], optional): an iterable of items that will be used to update the index. If this is set, equivalent to calling `index.update(items)` after initialization.
         """
+        if embedding_model is None:
+            from .hf import STEmbeddingModel
+
+            embedding_model = STEmbeddingModel()
         self.embedding_model = embedding_model
         self.modality = "text" if embedding_model is None else "embedding"
         self.project = atlas.AtlasProject(
