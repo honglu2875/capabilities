@@ -4,23 +4,72 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "capabilities"
-version = "0.0.8"
+version = "0.1.0"
 authors = [
   { name="Blazon AI", email="support@blazon.ai" },
 ]
-description = ""
+description = "Build trusted, faster, and more powerful applications with the Blazon Capabilities API."
 readme = "README.md"
 license = { file="LICENSE" }
 requires-python = ">=3.8"
 dependencies = [
-             "fire",
-             "requests",
-             "dacite",
-             "asyncio",
-             "aiohttp",
-             "pdfminer.six",
-             "tiktoken",
-             "blobfile",
-             "pydantic",
-             "termcolor",
+  "fire",
+  "requests",
+  "dacite",
+  "asyncio",
+  "aiohttp",
+  "pdfminer.six",
+  "tiktoken",
+  "blobfile",
+  "pydantic",
+  "pydantic[dotenv]",
+  "termcolor",
+  "rich",
 ]
+
+[project.optional-dependencies]
+search = [
+  "pyllamacpp",
+  "python-magic",
+  "bs4",
+  "diskcache",
+]
+nomic = [
+  "nomic",
+]
+sentence-transformers = [
+  "sentence-transformers"
+]
+
+[tool.hatch.envs.default]
+dependencies = [
+  "coverage[toml]>=6.5",
+  "pytest",
+  "pytest-snapshot",
+  "hypothesis",
+  "numpy",
+  "torch",
+  "nomic",
+  "sentence-transformers",
+  "requests",
+  "dacite",
+  "aiohttp",
+  "tiktoken",
+  "pyllamacpp",
+  "python-magic",
+  "bs4",
+  "diskcache",
+]
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "coverage run -m pytest {args:tests}"
+cov-report = [
+  "- coverage combine",
+  "coverage report",
+]
+cov = [
+  "test-cov",
+  "cov-report",
+]
+[[tool.hatch.envs.all.matrix]]
+python = ["3.8", "3.9", "3.10", "3.11"]
