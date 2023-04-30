@@ -100,10 +100,18 @@ class NomicIndex(Generic[T], AbstractSearchIndex[T]):
 
     def update(self, items: Iterable[T]):
         items = list(items)
-        self.items.update({item.id: item for item in items})
+        for item in items:
+            if item.id in self.items:
+                raise RuntimeError(f"Item {item.id} already exists in the index.")
+            self.items[item.id] = item
         if self.embedding_model is not None:
             chunks = list(get_chunks(items, self.embedding_model))
-            self.chunks.update({c.unique_id: c for c in chunks})
+            for chunk in chunks:
+                if chunk.unique_id in self.chunks:
+                    raise RuntimeError(
+                        f"Chunk {chunk.unique_id} already exists in the index."
+                    )
+                self.chunks[chunk.unique_id] = chunk
             texts = [chunk.text for chunk in chunks]
             embeddings = self.embedding_model.encode(texts)
             assert isinstance(embeddings, np.ndarray)
