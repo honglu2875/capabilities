@@ -12,6 +12,7 @@ jobs:
     name: "Python test"
     runs-on: ubuntu-latest
     env:
+      CAPABILITIES_API_KEY: ${{ secrets.CAPABILITIES_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - uses: actions/checkout@v3
