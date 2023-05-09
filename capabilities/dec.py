@@ -65,11 +65,13 @@ class AiFunction(Generic[P, R]):
         else:
             output_spec = self.output_spec
         payload = dict(
-            input_spec = self.input_spec,
-            output_spec = output_spec,
-            instructions = self.instructions,
-            input = input_dict
+            input_spec=self.input_spec,
+            output_spec=output_spec,
+            instructions=self.instructions,
+            input=input_dict,
         )
+        if CONFIG.api_key is None:
+            raise RuntimeError("CAPABILITIES_API_KEY is not set")
         resp = requests.post(
             "https://api.blazon.ai/blazon/structured",
             headers={

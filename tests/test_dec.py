@@ -14,6 +14,7 @@ def test_llm():
     for n in [0, 1, 2, 4, 10]:
         result = fruit_emojis(n)
         assert len(result) == n
+        print(result)
 
 
 if __name__ == "__main__":
