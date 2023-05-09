@@ -1,8 +1,9 @@
 import os
 import dataclasses
+import typing
 import dacite
 from dataclasses import dataclass, field, is_dataclass
-from typing import Dict, Any, List, Union, Literal
+from typing import Dict, Any, List, Type, TypeAlias, Union, Literal
 from typing import Optional
 import requests
 import aiohttp
@@ -10,6 +11,7 @@ import asyncio
 import time
 from capabilities.config import CONFIG
 from pydantic import BaseModel
+from pydantic.fields import ModelField
 from pydantic.main import ModelMetaclass
 
 
@@ -51,13 +53,18 @@ class DocumentQA(CapabilityBase):
     """
 
     def __call__(self, document: str, query: str):
-        print(f"[DocumentQA] running query against document with {len(document)} characters")
+        print(
+            f"[DocumentQA] running query against document with {len(document)} characters"
+        )
         patience = 8
         count = 0
         while count < patience:
             try:
                 url = "https://api.blazon.ai/blazon/documentqa"
-                headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
+                headers = {
+                    "Content-type": "application/json",
+                    "api-key": CONFIG.api_key,
+                }
                 payload = {
                     "document": document,
                     "query": query,
@@ -72,7 +79,9 @@ class DocumentQA(CapabilityBase):
         raise Exception("[DocumentQA] failed after hitting max retries")
 
     async def run_async(self, document: str, query: str, session=None):
-        print(f"[DocumentQA] running query against document with {len(document)} characters")
+        print(
+            f"[DocumentQA] running query against document with {len(document)} characters"
+        )
         patience = 8
         count = 0
         while count < patience:
@@ -82,8 +91,13 @@ class DocumentQA(CapabilityBase):
                     async with aiohttp.ClientSession(
                         connector=aiohttp.TCPConnector(ssl=False)
                     ) as session:
-                        return await self.run_async(document=document, query=query, session=session)
-                headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
+                        return await self.run_async(
+                            document=document, query=query, session=session
+                        )
+                headers = {
+                    "Content-type": "application/json",
+                    "api-key": CONFIG.api_key,
+                }
                 payload = {
                     "document": document,
                     "query": query,
@@ -137,11 +151,16 @@ class Summarize(CapabilityBase):
         while count < patience:
             try:
                 url = "https://api.blazon.ai/blazon/summarize"
-                headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
+                headers = {
+                    "Content-type": "application/json",
+                    "api-key": CONFIG.api_key,
+                }
                 payload = {
                     "document": document,
                 }
-                print(f"[Summarize] running query against document with {len(document)} characters")
+                print(
+                    f"[Summarize] running query against document with {len(document)} characters"
+                )
                 resp = requests.post(url=url, headers=headers, json=payload)
                 return resp.json()
             except:
@@ -162,11 +181,16 @@ class Summarize(CapabilityBase):
                         connector=aiohttp.TCPConnector(ssl=False)
                     ) as session:
                         return await self.run_async(document=document, session=session)
-                headers = {"Content-type": "application/json", "api-key": CONFIG.api_key}
+                headers = {
+                    "Content-type": "application/json",
+                    "api-key": CONFIG.api_key,
+                }
                 payload = {
                     "document": document,
                 }
-                print(f"[Summarize] running query against document with {len(document)} characters")
+                print(
+                    f"[Summarize] running query against document with {len(document)} characters"
+                )
                 async with session.post(url, headers=headers, json=payload) as resp:
                     response = await resp.json()
                     try:
@@ -183,12 +207,38 @@ class Summarize(CapabilityBase):
         raise Exception("[Summarize] failed after hitting max retries")
 
 
-def flatten_model(m: Union[ModelMetaclass, str, bool, float, int]) -> Dict[Any, Any]:
-    if hasattr(m, "__dict__"):
-        if m.__dict__.get("_name") == "List":
-            return [flatten_model(m.__args__[0])]
-    if isinstance(m, ModelMetaclass) or is_dataclass(m):
-        return {k: flatten_model(v) for k, v in m.__annotations__.items()}
+StructuredSchema: TypeAlias = Any
+
+
+def flatten_model(m: Type, path: list[str] = []) -> StructuredSchema:
+    """Converts the given type m to a structured schema.
+
+    Args:
+        * m (Type): The type to be converted.
+        * path (list[str], optional): The path to the current type,
+          used for more helpful diagnostic messages saying where
+          the conversion failed. Defaults to [].
+    """
+    if issubclass(m, list):
+        args = typing.get_args(m)
+        if len(args) != 1:
+            p = ".".join(path)
+            raise TypeError(
+                f"can't deduce list type arg for {m} at {p}, please provide a type annotation to list.",
+                path,
+            )
+        t = flatten_model(args[0])
+        return [t]
+    elif issubclass(m, BaseModel):  # type: ignore
+        fields: dict[str, ModelField] = m.__fields__
+        return {
+            k: flatten_model(f.annotation, path=path + [k]) for k, f in fields.items()
+        }
+    elif is_dataclass(m):
+        return {
+            f.name: flatten_model(f.type, path=path + [f.name])
+            for f in dataclasses.fields(m)
+        }
     elif m == str:
         return "string"
     elif m == bool:
@@ -198,7 +248,11 @@ def flatten_model(m: Union[ModelMetaclass, str, bool, float, int]) -> Dict[Any, 
     elif m == int:
         return "int"
     else:
-        raise Exception(f"unsupported datatype={m}")
+        p = ".".join(path)
+        raise TypeError(
+            f"unsupported datatype={m} at {p}\nPlease make sure that all fields are annotated with a bool, int, float, str or a dataclass, list, or pydantic BaseModel. If you need other types supported, let us know!"
+        )
+
 
 @dataclass
 class Structured(CapabilityBase):
@@ -216,7 +270,10 @@ class Structured(CapabilityBase):
     """
 
     headers: Dict[Any, Any] = field(
-        default_factory=lambda: {"Content-type": "application/json", "api-key": CONFIG.api_key}
+        default_factory=lambda: {
+            "Content-type": "application/json",
+            "api-key": CONFIG.api_key,
+        }
     )
     url: str = "https://api.blazon.ai/blazon/structured"
 
@@ -257,9 +314,12 @@ class Structured(CapabilityBase):
             instructions=instructions,
         )
         if session is None:
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-                async with session.post(self.url, headers=self.headers, json=payload) as resp:
-
+            async with aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(ssl=False)
+            ) as session:
+                async with session.post(
+                    self.url, headers=self.headers, json=payload
+                ) as resp:
                     result = await resp.json()
                     result = result["output"]
                     return (
@@ -268,7 +328,9 @@ class Structured(CapabilityBase):
                         else dacite.from_dict(output_spec, result)
                     )
         else:
-            async with session.post(self.url, headers=self.headers, json=payload) as resp:
+            async with session.post(
+                self.url, headers=self.headers, json=payload
+            ) as resp:
                 result = (await resp.json())["output"]
                 return (
                     output_spec.parse_obj(result)
