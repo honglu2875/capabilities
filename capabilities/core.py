@@ -3,7 +3,7 @@ import dataclasses
 import typing
 import dacite
 from dataclasses import dataclass, field, is_dataclass
-from typing import Dict, Any, List, Type, TypeAlias, Union, Literal
+from typing import Dict, Any, List, Type, TypeAlias, TypeVar, Union, Literal
 from typing import Optional
 import requests
 import aiohttp
@@ -13,6 +13,9 @@ from capabilities.config import CONFIG
 from pydantic import BaseModel
 from pydantic.fields import ModelField
 from pydantic.main import ModelMetaclass
+import logging
+
+logger = logging.getLogger("capabilities")
 
 
 @dataclass
@@ -219,7 +222,8 @@ def flatten_model(m: Type, path: list[str] = []) -> StructuredSchema:
           used for more helpful diagnostic messages saying where
           the conversion failed. Defaults to [].
     """
-    if issubclass(m, list):
+    orig = typing.get_origin(m)
+    if m == list or orig == list:
         args = typing.get_args(m)
         if len(args) != 1:
             p = ".".join(path)
@@ -229,8 +233,8 @@ def flatten_model(m: Type, path: list[str] = []) -> StructuredSchema:
             )
         t = flatten_model(args[0])
         return [t]
-    elif issubclass(m, BaseModel):  # type: ignore
-        fields: dict[str, ModelField] = m.__fields__
+    elif isinstance(m, ModelMetaclass):
+        fields: dict[str, ModelField] = m.__fields__ # type: ignore
         return {
             k: flatten_model(f.annotation, path=path + [k]) for k, f in fields.items()
         }
@@ -254,6 +258,50 @@ def flatten_model(m: Type, path: list[str] = []) -> StructuredSchema:
         )
 
 
+def to_dict(obj: Any) -> Any:
+    if isinstance(obj, BaseModel):
+        return obj.dict()
+    elif is_dataclass(obj):
+        return dataclasses.asdict(obj)
+    elif isinstance(obj, list):
+        return [to_dict(o) for o in obj]
+    elif isinstance(obj, dict):
+        return {k: to_dict(v) for k, v in obj.items()}
+    elif isinstance(obj, (str, bool, float, int)):
+        return obj
+    else:
+        raise TypeError(f"unsupported datatype={obj}")
+
+
+T = TypeVar("T")
+
+
+def of_dict(t: Type[T], d: Any) -> T:
+    if isinstance(t, ModelMetaclass):
+        assert isinstance(d, dict)
+        return t.parse_obj(d)
+    elif is_dataclass(t):
+        assert isinstance(d, dict)
+        return dacite.from_dict(t, d)  # type: ignore
+    elif t == list or typing.get_origin(t) == list:
+        assert isinstance(d, list)
+        args = typing.get_args(t)
+        if len(args)!= 1:
+            return d # type: ignore
+        (arg,) = args
+        return [of_dict(arg, o) for o in d]  # type: ignore
+    elif t == dict:
+        (kt, vt) = typing.get_args(t)
+        assert isinstance(d, dict)
+        assert kt in [str, int]
+        return {of_dict(kt, k): of_dict(vt, v) for k, v in d.items()}  # type: ignore
+    elif t in [str, int, float, bool]:
+        assert isinstance(d, t)
+        return d
+    else:
+        raise TypeError(f"unsupported datatype={t}")
+
+
 @dataclass
 class Structured(CapabilityBase):
     """
@@ -269,7 +317,7 @@ class Structured(CapabilityBase):
         async run_async(self, input_spec: ModelMetaclass, output_spec: ModelMetaclass, instructions: str, input: BaseModel, session=None) -> Union[output_spec, BaseModel]: Calls the API asynchronously. Returns output_spec object if output_spec is ModelMetaclass or if it is an instance of a BaseModel.
     """
 
-    headers: Dict[Any, Any] = field(
+    headers: dict = field(
         default_factory=lambda: {
             "Content-type": "application/json",
             "api-key": CONFIG.api_key,
@@ -282,22 +330,19 @@ class Structured(CapabilityBase):
         input_spec: ModelMetaclass,
         output_spec: ModelMetaclass,
         instructions: str,
-        input: BaseModel,
+        input: Any,
     ):
         payload = dict(
             input_spec=flatten_model(input_spec),
             output_spec=flatten_model(output_spec),
             instructions=instructions,
-            input=dataclasses.asdict(input) if is_dataclass(input) else input.dict(),
+            input=to_dict(input),
         )
         r = requests.post(self.url, headers=self.headers, json=payload)
-        print("R: ", r)
+        r.raise_for_status()
+        logger.debug("R: ", r)
         result = r.json()["output"]
-        return (
-            output_spec.parse_obj(result)
-            if isinstance(output_spec, ModelMetaclass)
-            else dacite.from_dict(output_spec, result)
-        )
+        return of_dict(output_spec, result)
 
     async def run_async(
         self,
@@ -310,7 +355,7 @@ class Structured(CapabilityBase):
         payload = dict(
             input_spec=flatten_model(input_spec),
             output_spec=flatten_model(output_spec),
-            input=dataclasses.asdict(input) if is_dataclass(input) else input.dict(),
+            input=to_dict(input),
             instructions=instructions,
         )
         if session is None:
@@ -322,21 +367,13 @@ class Structured(CapabilityBase):
                 ) as resp:
                     result = await resp.json()
                     result = result["output"]
-                    return (
-                        output_spec.parse_obj(result)
-                        if isinstance(output_spec, ModelMetaclass)
-                        else dacite.from_dict(output_spec, result)
-                    )
+                    return of_dict(output_spec, result)
         else:
             async with session.post(
                 self.url, headers=self.headers, json=payload
             ) as resp:
                 result = (await resp.json())["output"]
-                return (
-                    output_spec.parse_obj(result)
-                    if isinstance(output_spec, ModelMetaclass)
-                    else dacite.from_dict(output_spec, result)
-                )
+                return of_dict(output_spec, result)
 
 
 _CAPABILITIES = {

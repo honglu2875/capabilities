@@ -49,7 +49,10 @@ Write a bullet-pointed summary of the `text` as a list of supported bullet point
 
     # synthesis call
     document_summary = Capability("blazon/structured")(
-        input_spec=Document, output_spec=DocumentSummary, input=inp, instructions=instructions
+        input_spec=Document,
+        output_spec=DocumentSummary,
+        input=inp,
+        instructions=instructions,
     )
 
     for x in document_summary.supportedBulletPoints:
@@ -224,7 +227,9 @@ def example_translation():
     instructions = "Given the input `text`, produce a `french_translation` which translates the `text` into French. Also produce a word-level translation called `word_translations`, which is a list of (english word, french transliteration) pairs."
 
     # print the task to console
-    result = Capability("blazon/structured")(InputText, TranslationOutput, instructions, inp)
+    result = Capability("blazon/structured")(
+        InputText, TranslationOutput, instructions, inp
+    )
     import json
 
     print(json.dumps(result.dict(), indent=2))
@@ -289,8 +294,6 @@ def example_selenium():
         title="Google",
     )
 
-    
-
     print(
         Capability("blazon/structured")(
             SynthesisRequest, SynthesisResponse, instructions, input=input
@@ -316,4 +319,5 @@ def make_paragraph(bullet_points: List[str]) -> str:
 # example usage: python -m capabilities.example example_translation
 if __name__ == "__main__":
     import sys
+
     fire.Fire(component=locals()[sys.argv[1]], command=sys.argv[2:])
