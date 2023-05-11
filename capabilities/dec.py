@@ -1,5 +1,7 @@
 import functools
+import ast
 import inspect
+import importlib
 from typing import Callable, Generic, ParamSpec, TypeVar, overload
 import warnings
 
@@ -108,3 +110,89 @@ def llm(*args, **kwargs):  # type: ignore
         return decorator(args[0])
     else:
         return functools.partial(AiFunction, *args, **kwargs)
+
+
+# todo: directly assign this as an attribute of `llm`? Or make `llm` a class?
+def llm_inline(regenerate=True, num_tries=3):
+
+    @llm
+    def complete_code(initial_codes: str, codes_before: str, codes_after: str) -> str:
+        """
+        Given the initial lines of a function, the codes before the function, and the codes after the function,
+        follow the docstring to complete the function so that
+        1. the initial lines of the code remain unchanged.
+        2. it executes without error in the context.
+        3. it fulfills the requirements set by its docstring in the context.
+
+        Args:
+            initial_codes: the first few lines of the function. Including the function signature and the docstring.
+            codes_before: the codes before the function.
+            codes_after: the codes after the function
+
+        Returns:
+            The completed function.
+        """
+        ...
+
+    def wrapper(func: Callable[P, R]):
+        if not regenerate:  # no-op if `regenerate==False`
+            return func
+
+        lines, start_lineno = inspect.getsourcelines(func)
+        code_before, code_after = get_llm_inline_context(func)
+
+        for _ in range(num_tries):  # Try `num_tries` times
+            completed = complete_code("\n".join(lines[1:]), code_before, code_after)
+
+            # Try to parse out the function body, but if unsuccessful, fall back to the original completion.
+            processed = postprocess(completed, func.__name__)
+            completed = processed if processed else completed
+
+            new_decorator = f"@llm_inline(regenerate=False)"
+            if input(f"The following code will be written to your file: \n{completed}\nContinue? (y/n)") == "y":
+                with open(inspect.getfile(func), "w") as f:
+                    f.write(f"{code_before}\n{new_decorator}\n{completed}\n{code_after}")
+
+                # Reload the module and the functions
+
+                # todo: reload the script itself could result in ModuleNotFoundError: spec not found for the module '__main__'. Trying an dirty way.
+                try:
+                    module = inspect.getmodule(func)
+                    importlib.reload(module)
+                    globals().update(vars(module))
+                    return getattr(module, func.__name__)
+                except:
+                    exec(completed, globals())
+                    print(globals()[func.__name__])
+                    return globals()[func.__name__]
+
+
+    return wrapper
+
+
+def get_llm_inline_context(func) -> tuple[str, str]:
+    source_path = inspect.getfile(func)
+    lines, start_lineno = inspect.getsourcelines(func)
+    end_lineno = start_lineno + len(lines)
+
+    with open(source_path, "r") as f:
+        file_content = f.read().split("\n")
+
+    return "\n".join(file_content[:start_lineno - 1]), "\n".join(file_content[end_lineno:])
+
+
+def postprocess(code: str, func_name: str) -> str:
+    try:
+        parsed = ast.parse(code)
+    except SyntaxError:
+        return ""
+
+    completed_func = None
+    for node in parsed.body:
+        if isinstance(node, ast.FunctionDef) and node.name == func_name:
+            node.decorator_list = []
+            completed_func = ast.unparse(node)
+            return completed_func
+
+    return ""
+
