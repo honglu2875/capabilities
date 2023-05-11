@@ -147,14 +147,12 @@ def llm_inline(regenerate=True, num_tries=3):
             # Try to parse out the function body, but if unsuccessful, fall back to the original completion.
             processed = postprocess(completed, func.__name__)
             completed = processed if processed else completed
-
             new_decorator = f"@llm_inline(regenerate=False)"
             if input(f"The following code will be written to your file: \n{completed}\nContinue? (y/n)") == "y":
                 with open(inspect.getfile(func), "w") as f:
                     f.write(f"{code_before}\n{new_decorator}\n{completed}\n{code_after}")
 
                 # Reload the module and the functions
-
                 # todo: reload the script itself could result in ModuleNotFoundError: spec not found for the module '__main__'. Trying an dirty way.
                 try:
                     module = inspect.getmodule(func)
@@ -163,7 +161,6 @@ def llm_inline(regenerate=True, num_tries=3):
                     return getattr(module, func.__name__)
                 except:
                     exec(completed, globals())
-                    print(globals()[func.__name__])
                     return globals()[func.__name__]
 
 
