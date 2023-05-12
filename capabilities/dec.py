@@ -112,7 +112,6 @@ def llm(*args, **kwargs):  # type: ignore
         return functools.partial(AiFunction, *args, **kwargs)
 
 
-# todo: directly assign this as an attribute of `llm`? Or make `llm` a class?
 def llm_inline(regenerate=True, num_tries=3):
 
     @llm
@@ -134,7 +133,7 @@ def llm_inline(regenerate=True, num_tries=3):
         """
         ...
 
-    def wrapper(func: Callable[P, R]):
+    def wrapper(func: Callable[P, R]) -> Callable[P, R]:
         if not regenerate:  # no-op if `regenerate==False`
             return func
 
@@ -153,7 +152,8 @@ def llm_inline(regenerate=True, num_tries=3):
                     f.write(f"{code_before}\n{new_decorator}\n{completed}\n{code_after}")
 
                 # Reload the module and the functions
-                # todo: reload the script itself could result in ModuleNotFoundError: spec not found for the module '__main__'. Trying an dirty way.
+                # todo: reload the script itself could result in ModuleNotFoundError: spec not found for the module '__main__'.
+                #       Trying an dirty way but may need to explore best-practice later.
                 try:
                     module = inspect.getmodule(func)
                     importlib.reload(module)
