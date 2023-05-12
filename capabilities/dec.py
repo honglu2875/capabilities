@@ -184,7 +184,6 @@ def postprocess(code: str, func_name: str) -> str:
     except SyntaxError:
         return ""
 
-    completed_func = None
     for node in parsed.body:
         if isinstance(node, ast.FunctionDef) and node.name == func_name:
             node.decorator_list = []
