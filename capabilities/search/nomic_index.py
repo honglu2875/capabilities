@@ -92,9 +92,7 @@ class NomicIndex(Generic[T], AbstractSearchIndex[T]):
                 "Nomic does not yet have enough data to index. Please make sure there are at least 20 datapoints."
             )
         if len(self.project.indices) == 0:
-            return self.project.create_index(
-                name="main-index", colorable_fields=["item_id"]
-            )
+            return self.project.create_index(name="main-index", colorable_fields=["item_id"])
         else:
             return self.project.indices[0].projections[0]  # idk
 
@@ -108,9 +106,7 @@ class NomicIndex(Generic[T], AbstractSearchIndex[T]):
             chunks = list(get_chunks(items, self.embedding_model))
             for chunk in chunks:
                 if chunk.unique_id in self.chunks:
-                    raise RuntimeError(
-                        f"Chunk {chunk.unique_id} already exists in the index."
-                    )
+                    raise RuntimeError(f"Chunk {chunk.unique_id} already exists in the index.")
                 self.chunks[chunk.unique_id] = chunk
             texts = [chunk.text for chunk in chunks]
             embeddings = self.embedding_model.encode(texts)
@@ -152,9 +148,7 @@ class NomicIndex(Generic[T], AbstractSearchIndex[T]):
                 return items
 
         else:
-            raise NotImplementedError(
-                "search on a text-mode Nomic index is not yet implemented."
-            )
+            raise NotImplementedError("search on a text-mode Nomic index is not yet implemented.")
 
     def __len__(self):
         raise NotImplementedError("todo")

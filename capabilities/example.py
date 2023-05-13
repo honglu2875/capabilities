@@ -58,7 +58,7 @@ Write a bullet-pointed summary of the `text` as a list of supported bullet point
     for x in document_summary.supportedBulletPoints:
         print(f"claim: {x.bullet_point}")
         print(f'    support: """{x.supporting_text}"""\n')
-        
+
 
 def example_document_qa():
     c = Capability("blazon/document_qa")
@@ -216,9 +216,7 @@ def example_translation():
     instructions = "Given the input `text`, produce a `french_translation` which translates the `text` into French. Also produce a word-level translation called `word_translations`, which is a list of (english word, french transliteration) pairs."
 
     # print the task to console
-    result = Capability("blazon/structured")(
-        InputText, TranslationOutput, instructions, inp
-    )
+    result = Capability("blazon/structured")(InputText, TranslationOutput, instructions, inp)
     import json
 
     print(json.dumps(result.dict(), indent=2))
@@ -315,7 +313,7 @@ def synth_app(instructions: str):
         instruction: str
 
     class Plan(BaseModel):
-        top_level_description: str # model-generated description of what the end result should look like
+        top_level_description: str  # model-generated description of what the end result should look like
         partial_elements: List[PartialWebsiteElement]
 
     instruction = """\
@@ -341,10 +339,14 @@ def synth_app(instructions: str):
         class HTMLElement(BaseModel):
             html_element: str
 
-        return Capability("blazon/structured")(Plan2, HTMLElement, instruction, Plan2(plan=p1, partial_website_element=p2))
+        return Capability("blazon/structured")(
+            Plan2, HTMLElement, instruction, Plan2(plan=p1, partial_website_element=p2)
+        )
 
     with futures.ThreadPoolExecutor(8) as pool:
-        html_elements = pool.map(lambda p: generate_html_element(output, p), output.partial_elements)
+        html_elements = pool.map(
+            lambda p: generate_html_element(output, p), output.partial_elements
+        )
 
     final_document = "\n".join(x.html_element for x in html_elements)
 
@@ -352,6 +354,7 @@ def synth_app(instructions: str):
         f.write(final_document)
 
     return final_document
+
 
 # from multisearch.trace_flow import if_json_spec_async
 # synthesize a plan / chain of thought using GPT4

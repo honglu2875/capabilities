@@ -161,9 +161,13 @@ def text_embed(prompt):
     r = requests.post("https://api.openai.com/v1/embeddings", headers=headers, json=payload)
     return r.json()["data"][0]["embedding"]
 
+
 T = TypeVar("T")
 
-def parallel_map(fn: Callable, xs: List[T], parallelism: int = 8, ignore_exceptions: bool = False) -> Iterable[T]:
+
+def parallel_map(
+    fn: Callable, xs: List[T], parallelism: int = 8, ignore_exceptions: bool = False
+) -> Iterable[T]:
     results = [None] * len(xs)  # initialize with None
     current_index = 0
 
@@ -172,6 +176,7 @@ def parallel_map(fn: Callable, xs: List[T], parallelism: int = 8, ignore_excepti
         exception: Optional[Any] = None
 
     if ignore_exceptions:
+
         def wrapper_fn(*args, **kwargs):
             try:
                 return fn(*args, **kwargs)
@@ -179,7 +184,7 @@ def parallel_map(fn: Callable, xs: List[T], parallelism: int = 8, ignore_excepti
                 return IgnoreException(exception=e)
 
     fn2 = wrapper_fn if ignore_exceptions else fn
-    
+
     def get_results():
         with concurrent.futures.ThreadPoolExecutor(parallelism) as executor:
             futures = [executor.submit(fn2, x) for x in xs]

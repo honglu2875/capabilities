@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 class Document(TextItem):
     text: str
     doc_id: str
-    location : str
-    digest : str
+    location: str
+    digest: str
 
     @property
     def id(self):
@@ -34,9 +34,7 @@ class Document(TextItem):
         return self.text
 
 
-def create_document(
-    location: Union[str, Path], doc_id: Optional[str] = None
-) -> Document:
+def create_document(location: Union[str, Path], doc_id: Optional[str] = None) -> Document:
     """Create a document from a web url or file path.
 
     Args:
@@ -74,4 +72,4 @@ def create_document(
             )
             raise
 
-    return Document(text=text, doc_id=doc_id, location=location, digest = digest(text))
+    return Document(text=text, doc_id=doc_id, location=location, digest=digest(text))

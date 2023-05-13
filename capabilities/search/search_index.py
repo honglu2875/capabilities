@@ -46,9 +46,7 @@ def simple_chunker(
         return
     # [todo] maybe support a model.n_tokens_offset(n_tokens) -> offset method?
     ERROR_MARGIN = 10
-    assert (
-        ERROR_MARGIN < N
-    ), f"max_tokens_per_chunk {N} should be larger than {ERROR_MARGIN}"
+    assert ERROR_MARGIN < N, f"max_tokens_per_chunk {N} should be larger than {ERROR_MARGIN}"
     windows = list(argwindow(len(tokens), N - ERROR_MARGIN, 0.5))
 
     for window_start, window_end in windows:
@@ -76,9 +74,7 @@ class ChunkMap:
         self._idx_of_id: Dict[str, dict[Optional[str], int]] = defaultdict(dict)
         self._id_of_idx: Dict[int, str] = {}
         self._chunk_id_of_idx: Dict[int, Optional[str]] = {}
-        self._chunk_range_of_chunk_id: dict[
-            tuple[str, Optional[str]], Optional[range]
-        ] = {}
+        self._chunk_range_of_chunk_id: dict[tuple[str, Optional[str]], Optional[range]] = {}
 
     def __len__(self):
         return len(self._id_of_idx)
@@ -150,7 +146,7 @@ class SearchResult(Generic[T]):
         """Gets the chunk text or full text of the found item depending on the presence of substring_range."""
         fulltext = self.item.get_text()
         if self.substring_range is not None:
-            return fulltext[self.substring_range.start:self.substring_range.stop]
+            return fulltext[self.substring_range.start : self.substring_range.stop]
         else:
             return fulltext
 
@@ -176,9 +172,7 @@ class AbstractSearchIndex(Generic[T], ABC):
         raise NotImplementedError()
 
 
-def chunk_item(
-    item: TextItem, max_chunk_size: int, model: EmbeddingModel
-) -> Iterable[Chunk]:
+def chunk_item(item: TextItem, max_chunk_size: int, model: EmbeddingModel) -> Iterable[Chunk]:
     """Run item.chunk or fallback to simple_chunker.
 
     Also performs some validation that the chunks are constructed correctly.
@@ -267,7 +261,7 @@ class SearchIndex(Generic[T], AbstractSearchIndex[T]):
             NotImplementedError: If updating items that already exist in the index. (we are working on it)
         """
         iterated_items = []
-        
+
         for item in tqdm(items):
             if item.id in self.items:
                 # [todo]
