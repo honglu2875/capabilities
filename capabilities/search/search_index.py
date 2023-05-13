@@ -18,6 +18,7 @@ from .types import (
 from .util import Bijection, argwindow, unzip
 import numpy as np
 from tqdm import tqdm
+from ..util import parallel_map
 
 T = TypeVar("T", bound=TextItem)
 
@@ -266,6 +267,7 @@ class SearchIndex(Generic[T], AbstractSearchIndex[T]):
             NotImplementedError: If updating items that already exist in the index. (we are working on it)
         """
         iterated_items = []
+        
         for item in tqdm(items):
             if item.id in self.items:
                 # [todo]

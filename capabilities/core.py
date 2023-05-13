@@ -439,3 +439,5 @@ class Structured(CapabilityBase):
             ) as resp:
                 result = (await resp.json())["output"]
                 return of_dict(output_spec, result)
+
+

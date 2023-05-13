@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import time
 import aiohttp
 import fire
@@ -7,7 +8,7 @@ import openai
 import random
 import tiktoken
 import concurrent.futures
-from typing import Callable, List, Any, TypeVar, Iterable
+from typing import Callable, List, Any, TypeVar, Iterable, Optional
 import time
 from threading import Thread
 
@@ -162,12 +163,26 @@ def text_embed(prompt):
 
 T = TypeVar("T")
 
-def parallel_map(fn: Callable, xs: List[T], parallelism: int = 8) -> Iterable[T]:
+def parallel_map(fn: Callable, xs: List[T], parallelism: int = 8, ignore_exceptions: bool = False) -> Iterable[T]:
     results = [None] * len(xs)  # initialize with None
     current_index = 0
+
+    @dataclass
+    class IgnoreException:
+        exception: Optional[Any] = None
+
+    if ignore_exceptions:
+        def wrapper_fn(*args, **kwargs):
+            try:
+                return fn(*args, **kwargs)
+            except Exception as e:
+                return IgnoreException(exception=e)
+
+    fn2 = wrapper_fn if ignore_exceptions else fn
+    
     def get_results():
         with concurrent.futures.ThreadPoolExecutor(parallelism) as executor:
-            futures = [executor.submit(fn, x) for x in xs]
+            futures = [executor.submit(fn2, x) for x in xs]
 
             for future in concurrent.futures.as_completed(futures):
                 idx = futures.index(future)  # get index of current future
@@ -178,6 +193,14 @@ def parallel_map(fn: Callable, xs: List[T], parallelism: int = 8) -> Iterable[T]
     t.start()
     while current_index < len(results):
         if results[current_index] is not None:
-            yield results[current_index]
-            current_index += 1
+            if not ignore_exceptions:
+                yield results[current_index]
+                current_index += 1
+            else:
+                if not isinstance(results[current_index], IgnoreException):
+                    yield results[current_index]
+                    current_index += 1
+                else:
+                    print("Got an exception!", results[current_index])
+                    current_index += 1
     t.join()

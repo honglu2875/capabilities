@@ -1,5 +1,8 @@
 """ Open AI API client. """
-
+import time
+import logging
+from capabilities.util import parallel_map
+from tqdm import tqdm
 from datetime import datetime
 import json
 from typing import Literal, Optional, Union
@@ -118,7 +121,7 @@ def embeddings(params: EmbeddingRequest) -> EmbeddingResponse:
     resp = OpenAISettings().post("/v1/embeddings", json=params.dict(exclude_none=True))  # type: ignore
     j = resp.json()
     if resp.status_code // 100 == 4:
-        raise requests.HTTPError(f"{resp.status_code}: {json.dumps(j, indent=2)}", response = resp)
+        raise requests.HTTPError(f"{resp.status_code}: {json.dumps(j, indent=2)}", response=resp)
     resp.raise_for_status()
     r = EmbeddingResponse.parse_obj(j)
     return r
@@ -182,18 +185,28 @@ class OpenAIEmbeddingModel(EmbeddingModel):
         N = self.max_tokens_per_item
         for i, l in enumerate(lengths):
             if l > N:
-                raise ValueError(
-                    f"{i}th text {texts[i]} is too long, please chunk it first"
-                )
+                raise ValueError(f"{i}th text {texts[i]} is too long, please chunk it first")
         batches = argbatch(lengths, N)
         es = []
-        its = track(batches) if len(batches) > 100 else batches
-        for batch in its:
+        # its = track(batches) if len(batches) > 100 else batches
+        its = batches
+
+        def process_batch(batch, texts, embeddings, model_name):
             ts = texts[batch.start : batch.stop]
-            responses = embeddings(EmbeddingRequest(model=self.model_name, input=ts))
+            responses = embeddings(EmbeddingRequest(model=model_name, input=ts))
             new_es = np.array([r.embedding for r in responses.data])
             assert len(new_es) == len(ts)
+            return new_es
+
+        ARGS = [(batch, texts, embeddings, self.model_name) for batch in its]
+        its = parallel_map(
+            lambda x: process_batch(*x), ARGS, parallelism=8, ignore_exceptions=False
+        )
+        if len(batches) > 100:
+            its = track(its, total=len(ARGS), description="Generating embedding(s)...")
+        for new_es in its:
             es.append(new_es)
+
         es = np.concatenate(es, axis=0)
         assert len(es) == len(texts)
         return es
