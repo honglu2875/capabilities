@@ -9,13 +9,22 @@ import requests
 import aiohttp
 import asyncio
 import time
-from capabilities.config import CONFIG
+
+import aiohttp
+import dacite
+import requests
+from dataclasses import dataclass, field, is_dataclass, asdict
 from pydantic import BaseModel
 from pydantic.fields import ModelField
 from pydantic.main import ModelMetaclass
 import logging
 
 logger = logging.getLogger("capabilities")
+from typing import Any, Callable, Dict, List, Literal, Optional, Union
+
+from capabilities.config import CONFIG
+
+_CAPABILITIES = {}
 
 
 @dataclass
@@ -23,6 +32,63 @@ class CapabilityBase:
     ...
 
 
+@dataclass
+class Capability(CapabilityBase):
+    uri: str
+    _capability: Optional[CapabilityBase] = None
+
+    def __call__(self, *args, **kwargs):
+        return self._capability(*args, **kwargs)
+
+    async def run_async(self, *args, **kwargs):
+        return await self._capability.run_async(*args, **kwargs)
+
+    def __post_init__(self):
+        try:
+            self._capability = _CAPABILITIES[self.uri]
+        except KeyError as e:
+            print(f"KeyError={e}\nCapability lookup failed for uri={self.uri}.\nValid URIs are:")
+            for k in _CAPABILITIES.keys():
+                print(f"  {k}")
+
+
+from functools import wraps
+import inspect
+
+
+def register(uri: str) -> Callable:
+    """
+    A decorator that registers an instance of the decorated class
+    under the given URI in _CAPABILITIES.
+
+    Args:
+        uri (str): The URI to register the instance of the decorated class.
+
+    Returns:
+        Callable: The decorator function
+        that receives the decorated class and returns it unmodified.
+    """
+
+    def wrapper(cls):
+        async def async_run(sync_func, *args, **kwargs):
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, sync_func, *args, **kwargs)
+
+        _CAPABILITIES[uri] = cls() if inspect.isclass(cls) else cls
+        call_method = getattr(cls, "__call__")
+        if not hasattr(cls, "run_async"):
+
+            @wraps(call_method)
+            async def run_async(*args, **kwargs):
+                return await async_run(call_method, *args, **kwargs)
+
+            cls.run_async = run_async
+        return cls
+
+    return wrapper
+
+
+@register("blazon/document_qa")
 @dataclass
 class DocumentQA(CapabilityBase):
     """
@@ -56,9 +122,7 @@ class DocumentQA(CapabilityBase):
     """
 
     def __call__(self, document: str, query: str):
-        print(
-            f"[DocumentQA] running query against document with {len(document)} characters"
-        )
+        print(f"[DocumentQA] running query against document with {len(document)} characters")
         patience = 8
         count = 0
         while count < patience:
@@ -82,9 +146,7 @@ class DocumentQA(CapabilityBase):
         raise Exception("[DocumentQA] failed after hitting max retries")
 
     async def run_async(self, document: str, query: str, session=None):
-        print(
-            f"[DocumentQA] running query against document with {len(document)} characters"
-        )
+        print(f"[DocumentQA] running query against document with {len(document)} characters")
         patience = 8
         count = 0
         while count < patience:
@@ -94,9 +156,7 @@ class DocumentQA(CapabilityBase):
                     async with aiohttp.ClientSession(
                         connector=aiohttp.TCPConnector(ssl=False)
                     ) as session:
-                        return await self.run_async(
-                            document=document, query=query, session=session
-                        )
+                        return await self.run_async(document=document, query=query, session=session)
                 headers = {
                     "Content-type": "application/json",
                     "api-key": CONFIG.api_key,
@@ -121,6 +181,7 @@ class DocumentQA(CapabilityBase):
         raise Exception("[DocumentQA] failed after hitting max retries")
 
 
+@register("blazon/summarize")
 @dataclass
 class Summarize(CapabilityBase):
     """
@@ -161,9 +222,7 @@ class Summarize(CapabilityBase):
                 payload = {
                     "document": document,
                 }
-                print(
-                    f"[Summarize] running query against document with {len(document)} characters"
-                )
+                print(f"[Summarize] running query against document with {len(document)} characters")
                 resp = requests.post(url=url, headers=headers, json=payload)
                 return resp.json()
             except:
@@ -191,9 +250,7 @@ class Summarize(CapabilityBase):
                 payload = {
                     "document": document,
                 }
-                print(
-                    f"[Summarize] running query against document with {len(document)} characters"
-                )
+                print(f"[Summarize] running query against document with {len(document)} characters")
                 async with session.post(url, headers=headers, json=payload) as resp:
                     response = await resp.json()
                     try:
@@ -234,15 +291,10 @@ def flatten_model(m: Type, path: list[str] = []) -> StructuredSchema:
         t = flatten_model(args[0])
         return [t]
     elif isinstance(m, ModelMetaclass):
-        fields: dict[str, ModelField] = m.__fields__ # type: ignore
-        return {
-            k: flatten_model(f.annotation, path=path + [k]) for k, f in fields.items()
-        }
+        fields: dict[str, ModelField] = m.__fields__  # type: ignore
+        return {k: flatten_model(f.annotation, path=path + [k]) for k, f in fields.items()}
     elif is_dataclass(m):
-        return {
-            f.name: flatten_model(f.type, path=path + [f.name])
-            for f in dataclasses.fields(m)
-        }
+        return {f.name: flatten_model(f.type, path=path + [f.name]) for f in dataclasses.fields(m)}
     elif m == str:
         return "string"
     elif m == bool:
@@ -286,8 +338,8 @@ def of_dict(t: Type[T], d: Any) -> T:
     elif t == list or typing.get_origin(t) == list:
         assert isinstance(d, list)
         args = typing.get_args(t)
-        if len(args)!= 1:
-            return d # type: ignore
+        if len(args) != 1:
+            return d  # type: ignore
         (arg,) = args
         return [of_dict(arg, o) for o in d]  # type: ignore
     elif t == dict:
@@ -302,6 +354,15 @@ def of_dict(t: Type[T], d: Any) -> T:
         raise TypeError(f"unsupported datatype={t}")
 
 
+def unflatten_model(output_spec, result):
+    return (
+        output_spec.parse_obj(result)
+        if isinstance(output_spec, ModelMetaclass)
+        else dacite.from_dict(output_spec, result)
+    )
+
+
+@register("blazon/structured")
 @dataclass
 class Structured(CapabilityBase):
     """
@@ -317,13 +378,11 @@ class Structured(CapabilityBase):
         async run_async(self, input_spec: ModelMetaclass, output_spec: ModelMetaclass, instructions: str, input: BaseModel, session=None) -> Union[output_spec, BaseModel]: Calls the API asynchronously. Returns output_spec object if output_spec is ModelMetaclass or if it is an instance of a BaseModel.
     """
 
-    headers: dict = field(
-        default_factory=lambda: {
-            "Content-type": "application/json",
-            "api-key": CONFIG.api_key,
-        }
-    )
     url: str = "https://api.blazon.ai/blazon/structured"
+
+    @property
+    def headers(self):
+        return {"Content-type": "application/json", "api-key": CONFIG.api_key}
 
     def __call__(
         self,
@@ -359,48 +418,12 @@ class Structured(CapabilityBase):
             instructions=instructions,
         )
         if session is None:
-            async with aiohttp.ClientSession(
-                connector=aiohttp.TCPConnector(ssl=False)
-            ) as session:
-                async with session.post(
-                    self.url, headers=self.headers, json=payload
-                ) as resp:
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+                async with session.post(self.url, headers=self.headers, json=payload) as resp:
                     result = await resp.json()
                     result = result["output"]
                     return of_dict(output_spec, result)
         else:
-            async with session.post(
-                self.url, headers=self.headers, json=payload
-            ) as resp:
+            async with session.post(self.url, headers=self.headers, json=payload) as resp:
                 result = (await resp.json())["output"]
                 return of_dict(output_spec, result)
-
-
-_CAPABILITIES = {
-    "multi/structured": Structured(),
-    "multi/document_qa": DocumentQA(),
-    "multi/summarize": Summarize(),
-    "blazon/structured": Structured(),
-    "blazon/document_qa": DocumentQA(),
-    "blazon/summarize": Summarize(),
-}
-
-
-@dataclass
-class Capability(CapabilityBase):
-    uri: str
-    _capability: Optional[CapabilityBase] = None
-
-    def __call__(self, *args, **kwargs):
-        return self._capability(*args, **kwargs)
-
-    async def run_async(self, *args, **kwargs):
-        return await self._capability.run_async(*args, **kwargs)
-
-    def __post_init__(self):
-        try:
-            self._capability = _CAPABILITIES[self.uri]
-        except KeyError as e:
-            print(f"Capability lookup failed for uri={self.uri}.\nValid URIs are:")
-            for k in _CAPABILITIES.keys():
-                print(f"  {k}")

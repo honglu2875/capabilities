@@ -40,9 +40,7 @@ def argmin(a):
     return min(range(len(a)), key=lambda x: a[x])
 
 
-def partition(
-    pred: Callable[[T], bool], iterable: Iterable[T]
-) -> tuple[Iterable[T], Iterable[T]]:
+def partition(pred: Callable[[T], bool], iterable: Iterable[T]) -> tuple[Iterable[T], Iterable[T]]:
     """Use a predicate to partition entries into false entries and true entries
 
     origin: https://docs.python.org/3/library/itertools.html#itertools-recipes
@@ -201,7 +199,7 @@ class Bijection(Generic[U, V]):
 
 
 def digest(item: Union[str, bytes]):
-    """ Computes the blake2b digest of a given item. """
+    """Computes the blake2b digest of a given item."""
     h = blake2b()
     if isinstance(item, str):
         item = item.encode("utf-8")

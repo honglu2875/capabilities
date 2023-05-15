@@ -18,9 +18,7 @@ class Config(pydantic.BaseSettings):
         if self.api_key is None:
             out = sys.stdout
             msg_suffix = f"CAPABILITIES_API_KEY not set, get one here: {tc.colored('https://blazon.ai/signin', 'red')}"
-            out.write(
-                f" [   {tc.colored('warning', 'red', attrs=['bold'])}   ] " + msg_suffix
-            )
+            out.write(f" [   {tc.colored('warning', 'red', attrs=['bold'])}   ] " + msg_suffix)
             out.write("\n")
 
 

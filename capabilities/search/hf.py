@@ -3,6 +3,7 @@ from typing import Sequence
 from .types import EmbeddingModel
 from hashlib import blake2b
 from .util import batched, cache
+from tqdm import tqdm
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -56,7 +57,7 @@ class STEmbeddingModel(EmbeddingModel):
     def encode(self, sentences: list[str], show_progress_bar=True):
         h = blake2b()
         h.update(self.name.encode())
-        for sentence in sentences:
+        for sentence in tqdm(sentences):
             h.update(sentence.encode())
         digest = h.hexdigest()
         result = cache.get(digest)

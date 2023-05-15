@@ -47,9 +47,7 @@ class AiFunction(Generic[P, R]):
                 warnings.warn(
                     "using AiFunction without instructions. Please add a docstring to the decorated function."
                 )
-                self.instructions = (
-                    "Please produce the given output from the given input."
-                )
+                self.instructions = "Please produce the given output from the given input."
         self.signature = inspect.signature(func)
         self.input_spec = {
             k: _flatten_param(p, path=[k]) for k, p in self.signature.parameters.items()
